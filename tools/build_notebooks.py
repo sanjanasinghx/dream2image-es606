@@ -24,7 +24,12 @@ if "google.colab" in sys.modules:
         subprocess.run([*git, "clone", "-q", REPO_URL, REPO], check=True)
     else:
         subprocess.run([*git, "-C", REPO, "pull", "-q"], check=True)
+    freeze = lambda: subprocess.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True).stdout
+    before = freeze()
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", f"{REPO}/requirements-colab.txt"], check=True)
+    if freeze() != before:  # e.g. numpy upgraded under an already-loaded copy -> broken imports
+        print("Packages changed: restarting the runtime. When it reconnects, Run all again.")
+        os.kill(os.getpid(), 9)
 else:
     REPO = os.path.abspath("..")
 sys.path.insert(0, REPO)
