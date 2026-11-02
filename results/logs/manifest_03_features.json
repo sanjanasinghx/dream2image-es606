@@ -1,0 +1,23 @@
+{
+  "step": "03_features",
+  "created": "2026-11-02T04:08:38",
+  "runtime": "local",
+  "python": "3.13.18",
+  "seed": 20251006,
+  "config_sha": "1ab569d1f9108f49",
+  "outputs": [
+    {
+      "path": "derived/features_long.csv",
+      "sha256_16": "9d86a8c6e9b509b7"
+    },
+    {
+      "path": "derived/features_roi.csv",
+      "sha256_16": "a583ed71134783d9"
+    }
+  ],
+  "notes": {
+    "n_rows": 6208,
+    "frac_ok": 0.9432989690721649,
+    "median_r2": 0.966822619972111
+  }
+}

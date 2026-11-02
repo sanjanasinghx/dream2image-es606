@@ -1,0 +1,11 @@
+# Light Mac environment for the fast analyses (NB4-NB6) on small derived files; no torch, no raw data.
+# Heavy steps (download, preprocessing, embeddings) run on Colab.
+numpy
+pandas
+scipy
+scikit-learn
+statsmodels
+matplotlib
+pyyaml
+nbconvert
+ipykernel

@@ -20,9 +20,14 @@ def run(notebooks: list[str], timeout_s: int = 3600) -> None:
     out.mkdir(parents=True, exist_ok=True)
     # the child kernel skips the Colab bootstrap (Drive is already mounted, repo already pulled)
     env = dict(os.environ, D2I_DATA=str(data_root()), D2I_HEADLESS="1")
+    # One BLAS thread: the matrices here are small, and multi-threaded BLAS on them thrashes (~80x slower on
+    # Colab's 2 vCPUs, every core pegged on a laptop). Single-threaded is both faster and cooler.
+    env.update({k: "1" for k in ["OMP_NUM_THREADS", "OPENBLAS_NUM_THREADS", "MKL_NUM_THREADS",
+                                 "VECLIB_MAXIMUM_THREADS", "NUMEXPR_NUM_THREADS"]})
     for nb in notebooks:
         t0 = time.time()
-        r = subprocess.run([sys.executable, "-m", "jupyter", "nbconvert", "--to", "notebook", "--execute",
+        # this interpreter's nbconvert and kernel, not whichever `jupyter` is first on PATH
+        r = subprocess.run([sys.executable, "-m", "nbconvert", "--to", "notebook", "--execute",
                             str(REPO / "notebooks" / nb), "--output-dir", str(out),
                             f"--ExecutePreprocessor.timeout={timeout_s}"],
                            cwd=REPO / "notebooks", env=env, capture_output=True, text=True)

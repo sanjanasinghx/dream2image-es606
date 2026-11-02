@@ -1,0 +1,43 @@
+{
+  "step": "02_preprocess",
+  "created": "2026-11-02T04:06:48",
+  "runtime": "local",
+  "python": "3.13.18",
+  "seed": 20251006,
+  "config_sha": "1ab569d1f9108f49",
+  "outputs": [
+    {
+      "path": "results/tables/reject_rates.csv",
+      "sha256_16": "4c61ccf825ca076a"
+    },
+    {
+      "path": "results/tables/channel_quality.csv",
+      "sha256_16": "bb5d15b8ba5d4339"
+    },
+    {
+      "path": "results/tables/reject_summary.csv",
+      "sha256_16": "6f4da28b63f8f691"
+    }
+  ],
+  "notes": {
+    "n_clean_files": 122,
+    "channels": [
+      "C3",
+      "C4",
+      "F3",
+      "F4",
+      "F7",
+      "F8",
+      "Fp1",
+      "Fp2",
+      "Fpz",
+      "Fz",
+      "O1",
+      "O2",
+      "Oz",
+      "P3",
+      "P4",
+      "Pz"
+    ]
+  }
+}

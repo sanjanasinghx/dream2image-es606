@@ -1,0 +1,47 @@
+{
+  "step": "01_data",
+  "created": "2026-11-02T03:51:49",
+  "runtime": "colab",
+  "python": "3.13.18",
+  "seed": 20251006,
+  "config_sha": "d2176fa9d3eae8fd",
+  "outputs": [
+    {
+      "path": "derived/step0.json",
+      "sha256_16": "f11d6c8578f9d0cf"
+    },
+    {
+      "path": "results/tables/channel_availability.csv",
+      "sha256_16": "307ac11f56090867"
+    },
+    {
+      "path": "results/tables/channel_corr_mean.csv",
+      "sha256_16": "05af66e3c5f0be15"
+    },
+    {
+      "path": "results/tables/nesting_check.csv",
+      "sha256_16": "303ebf7e72531090"
+    },
+    {
+      "path": "results/tables/participants.csv",
+      "sha256_16": "2ec8e5f933cd592c"
+    },
+    {
+      "path": "results/tables/sample_exclusions.csv",
+      "sha256_16": "e8947d23ad48f183"
+    },
+    {
+      "path": "results/tables/scaling_check.csv",
+      "sha256_16": "28223772975fb6fd"
+    },
+    {
+      "path": "results/tables/scaling_outliers.csv",
+      "sha256_16": "8b0a66d7e024e9b8"
+    },
+    {
+      "path": "results/tables/site_hf_fraction.csv",
+      "sha256_16": "687a13de726b0fd6"
+    }
+  ],
+  "notes": {}
+}

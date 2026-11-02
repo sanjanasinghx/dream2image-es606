@@ -1,0 +1,31 @@
+{
+  "step": "05_h2",
+  "created": "2026-11-02T11:33:41",
+  "runtime": "local",
+  "python": "3.12.7",
+  "seed": 20251006,
+  "config_sha": "590ed9aeb72c12f2",
+  "outputs": [
+    {
+      "path": "results/tables/h2_decoding_by_epoch.csv",
+      "sha256_16": "79bac15916dfd749"
+    },
+    {
+      "path": "results/tables/h2_rank_scores.csv",
+      "sha256_16": "b770776daaced008"
+    },
+    {
+      "path": "results/tables/h2_e4_vs_e2.csv",
+      "sha256_16": "6850af4e41e6f354"
+    },
+    {
+      "path": "results/tables/h2_posthoc_awakening_type.csv",
+      "sha256_16": "131bc634fe59fbf3"
+    },
+    {
+      "path": "results/tables/h2_confound_control.csv",
+      "sha256_16": "55bfeea52d24c530"
+    }
+  ],
+  "notes": {}
+}

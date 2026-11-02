@@ -1,0 +1,18 @@
+{
+  "versions": {
+    "python": "3.13.18",
+    "numpy": "2.2.6",
+    "scipy": "1.16.3",
+    "pandas": "3.1.0",
+    "sklearn": "1.6.1",
+    "mne": "1.13.2",
+    "yasa": "0.8.1",
+    "specparam": "2.0.0rc7",
+    "torch": "2.11.0+cpu",
+    "transformers": "5.21.0",
+    "pyarrow": "23.0.1",
+    "huggingface_hub": "1.33.0",
+    "matplotlib": "3.11.2"
+  },
+  "gpu": null
+}

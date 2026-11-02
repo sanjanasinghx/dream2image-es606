@@ -492,7 +492,36 @@ print(dec.round(4).to_string(index=False))'''),
     code('''cmp = decode.paired_epoch_test(scores["E4"], scores["E2"], groups, dc["n_perm"], rng, dc["tost_bound"])
 pd.DataFrame([cmp]).to_csv(tables / "h2_e4_vs_e2.csv", index=False)
 print(json.dumps(cmp, indent=1, default=float))'''),
-    md("## 4. Post hoc: by awakening type (exploratory)"),
+    md("""## 4. Confound control (added after seeing section 2)
+
+The EEG carries a strong site fingerprint (hardware) and changes with awakening type (NB4), and report wording
+may also differ by site and awakening type. If so, the model can rank reports above chance by recognising the
+*category* of a recording, not its content. Two checks:
+
+- **Category-only baseline:** the same decoder with only site and awakening-type labels as features (no EEG).
+- **Stratified null:** reports shuffled only *within* the same site × awakening type. EEG beating this null
+  would mean content information beyond the category."""),
+    code('''meta["stratum"] = meta.site + "_" + meta.tag_class.fillna("case")
+print(meta.stratum.value_counts().to_dict())
+cat = pd.get_dummies(meta[["site", "tag_class"]].fillna("case")).to_numpy(float)
+fc = decode.make_folds(cat, groups)
+conf = [decode.vs_null(decode.loso_rank(fc, Y, dc["alphas"]),
+                       np.array([decode.loso_rank(fc, Y[p], dc["alphas"]) for p in perms]),
+                       {"model": "category labels only (no EEG)", "null": "free shuffle"})]
+strata = list(meta.groupby("stratum").indices.values())
+def strat_perm():
+    p = np.arange(len(Y))
+    for idx in strata:
+        p[idx] = rng.permutation(idx)
+    return p
+for e in dc["epochs"]:
+    f = decode.make_folds(X[e], groups)
+    null = np.array([decode.loso_rank(f, Y[strat_perm()], dc["alphas"]) for _ in range(dc["n_perm"])])
+    conf.append(decode.vs_null(scores[e], null, {"model": f"EEG {e}", "null": "within site x awakening type"}))
+conf = pd.DataFrame(conf)
+conf.to_csv(tables / "h2_confound_control.csv", index=False)
+print(conf.round(4).to_string(index=False))'''),
+    md("## 5. Post hoc: by awakening type (exploratory)"),
     code('''meta["awakening_type"] = np.where(meta.tag_class == "SO", "sleep onset (SO)", "other")
 sub = pd.DataFrame([decode.vs_null(scores[e][m], nulls[e][:, m], {"awakening_type": t, "epoch": e})
                     for t in meta.awakening_type.unique() for e in dc["epochs"]
@@ -500,11 +529,14 @@ sub = pd.DataFrame([decode.vs_null(scores[e][m], nulls[e][:, m], {"awakening_typ
 sub["p_fdr"] = stats.fdr_bh(sub.p_perm)
 sub.to_csv(tables / "h2_posthoc_awakening_type.csv", index=False)
 print(sub.round(4).to_string(index=False))'''),
-    md("## 5. Figure"),
+    md("## 6. Figure"),
     code('''fig, ax = plt.subplots(figsize=(6, 4))
 x = np.arange(len(dec))
 ax.bar(x, dec.above_chance, color="#4a6fa5", width=.6, label="observed - empirical chance")
-ax.scatter(x, dec.null_p95 - dec.null_mean, marker="_", s=600, color="#c0504d", label="null 95th percentile")
+ax.scatter(x, dec.null_p95 - dec.null_mean, marker="_", s=600, color="#c0504d", label="free-shuffle null, 95th pct")
+strat = conf[conf.null.str.startswith("within")].reset_index(drop=True)
+ax.scatter(x, strat.null_mean - dec.null_mean, marker="o", color="#e08214",
+           label="stratified-null mean (category info alone)")
 ax.axhline(0, color="k", lw=.8, ls=":")
 ax.set(xticks=x, xticklabels=[f"{e}\\np_holm={p:.3f}" for e, p in zip(dec.epoch, dec.p_holm)],
        ylabel="rank accuracy above empirical chance",
@@ -512,7 +544,8 @@ ax.set(xticks=x, xticklabels=[f"{e}\\np_holm={p:.3f}" for e, p in zip(dec.epoch,
 ax.legend(fontsize=8)
 fig.tight_layout(); fig.savefig(figs / "h2_decoding.pdf"); fig.savefig(figs / "h2_decoding.png", dpi=150)
 env.write_manifest(cfg, "05_h2", [tables / f for f in ["h2_decoding_by_epoch.csv", "h2_rank_scores.csv",
-                                                       "h2_e4_vs_e2.csv", "h2_posthoc_awakening_type.csv"]])'''),
+                                                       "h2_e4_vs_e2.csv", "h2_posthoc_awakening_type.csv",
+                                                       "h2_confound_control.csv"]])'''),
 ]
 
 
