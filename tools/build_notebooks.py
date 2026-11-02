@@ -530,18 +530,21 @@ sub["p_fdr"] = stats.fdr_bh(sub.p_perm)
 sub.to_csv(tables / "h2_posthoc_awakening_type.csv", index=False)
 print(sub.round(4).to_string(index=False))'''),
     md("## 6. Figure"),
-    code('''fig, ax = plt.subplots(figsize=(6, 4))
+    code('''strat = conf[conf.null.str.startswith("within")].reset_index(drop=True)
+fig, ax = plt.subplots(figsize=(7, 4.5))
 x = np.arange(len(dec))
-ax.bar(x, dec.above_chance, color="#4a6fa5", width=.6, label="observed - empirical chance")
-ax.scatter(x, dec.null_p95 - dec.null_mean, marker="_", s=600, color="#c0504d", label="free-shuffle null, 95th pct")
-strat = conf[conf.null.str.startswith("within")].reset_index(drop=True)
-ax.scatter(x, strat.null_mean - dec.null_mean, marker="o", color="#e08214",
-           label="stratified-null mean (category info alone)")
+ax.bar(x, dec.above_chance, color="#4a6fa5", width=.6, label="EEG decoder: observed - empirical chance")
+ax.scatter(x, dec.null_p95 - dec.null_mean, marker="_", s=600, color="#c0504d", label="free-shuffle null, 95th percentile")
+ax.scatter(x, strat.null_mean - dec.null_mean, marker="o", s=60, color="#e08214", zorder=3,
+           label="stratified null mean (site x awakening type only)")
+cat_only = conf[conf.model.str.startswith("category")].iloc[0]
+ax.axhline(cat_only.above_chance, color="#e08214", ls="--", lw=1, label="category labels alone, no EEG")
 ax.axhline(0, color="k", lw=.8, ls=":")
-ax.set(xticks=x, xticklabels=[f"{e}\\np_holm={p:.3f}" for e, p in zip(dec.epoch, dec.p_holm)],
-       ylabel="rank accuracy above empirical chance",
+ax.set(xticks=x, xticklabels=[f"{e}\\nfree p={p1:.3f}\\nstratified p={p2:.2f}"
+                              for e, p1, p2 in zip(dec.epoch, dec.p_holm, strat.p_perm)],
+       ylabel="rank accuracy above empirical chance", ylim=(0, .18),
        title="EEG -> report embedding, leave-one-participant-out")
-ax.legend(fontsize=8)
+ax.legend(fontsize=8, loc="upper center", ncol=2, bbox_to_anchor=(.5, -.28))
 fig.tight_layout(); fig.savefig(figs / "h2_decoding.pdf"); fig.savefig(figs / "h2_decoding.png", dpi=150)
 env.write_manifest(cfg, "05_h2", [tables / f for f in ["h2_decoding_by_epoch.csv", "h2_rank_scores.csv",
                                                        "h2_e4_vs_e2.csv", "h2_posthoc_awakening_type.csv",
