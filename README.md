@@ -13,8 +13,8 @@ outputs live on Google Drive under `MyDrive/ES606_Dream2Image/`.
 | `notebooks/02_preprocess.ipynb` | Epochs E1-E4, filtering, interpolation, artifact rejection → `derived/clean/` | CPU |
 | `notebooks/03_features.ipynb` | Band power and specparam aperiodic exponent per epoch × channel → `derived/features_*.csv` | CPU |
 
-To run later notebooks without a new Drive prompt each time, run them from an open notebook's runtime:
-`from d2i import runner; runner.run(["02_preprocess.ipynb", "03_features.ipynb"])`.
+To run several notebooks with one Drive prompt, open `notebooks/run_pipeline.ipynb`, edit its `NOTEBOOKS`
+list and Run all.
 Executed copies with outputs are saved to `results/notebooks/` on Drive.
 
 Open a notebook in Colab (File → Open notebook → GitHub) or through the Colab extension in VS Code.

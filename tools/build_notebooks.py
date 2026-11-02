@@ -578,6 +578,18 @@ print("Download it from Drive (ES606_Dream2Image/results_export.zip) and unzip i
 ]
 
 
+RUN = [
+    md("""# Run pipeline notebooks
+
+One Drive mount and one install for the whole pipeline. Edit `NOTEBOOKS` and use Runtime → Run all.
+On a fresh runtime the first cell installs extras and restarts once: Run all again after it reconnects.
+Executed copies with all outputs are saved to `results/notebooks/` on Drive."""),
+    code(BOOTSTRAP),
+    code('''NOTEBOOKS = ["05_h2.ipynb", "06_controls.ipynb"]
+from d2i import runner
+runner.run(NOTEBOOKS, timeout_s=7200)'''),
+]
+
 def write(name, cells):
     nb = {"cells": [], "metadata": {
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -600,4 +612,5 @@ if __name__ == "__main__":
     write("04_h1.ipynb", NB04)
     write("05_h2.ipynb", NB05)
     write("06_controls.ipynb", NB06)
+    write("run_pipeline.ipynb", RUN)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))
