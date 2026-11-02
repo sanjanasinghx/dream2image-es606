@@ -1,4 +1,4 @@
-# Dream2Image — ES606 Computational Neuroscience project
+# Dream2Image: (ES606) Computational Neuroscience project
 
 Analysis of [Dream2Image](https://huggingface.co/datasets/opsecsystems/Dream2Image) (Bellec, 2025):
 EEG recorded before awakening, paired with dream reports.
