@@ -50,13 +50,18 @@ def loso_rank(folds: list[dict], Y: np.ndarray, alphas) -> np.ndarray:
     for f in folds:
         ym = Y[f["tr"]].mean(0)
         Yc = Y[f["tr"]] - ym
-        UtY = f["U"].T @ Yc
+        U = f["U"]
+        UtY = U.T @ Yc
+        # Residual for a given alpha = R + U diag(1 - shrink) UtY, with R = Yc - U UtY fixed across alphas.
+        # Its row norms need only small (n x k) and (k x k) products, not a 768-wide product per alpha.
+        R = Yc - U @ UtY
+        rr, M, G = (R ** 2).sum(1), R @ UtY.T, UtY @ UtY.T
         s2, best = f["s"] ** 2, None
         for a in alphas:
             shrink = s2 / (s2 + a)
-            h = (f["U"] ** 2) @ shrink
-            loo = (Yc - f["U"] @ (shrink[:, None] * UtY)) / (1 - h)[:, None]
-            err = np.mean(loo ** 2)
+            UD = U * (1 - shrink)
+            res2 = rr + 2 * (UD * M).sum(1) + ((UD @ G) * UD).sum(1)
+            err = np.sum(res2 / (1 - (U ** 2) @ shrink) ** 2) / Yc.size
             if best is None or err < best[0]:
                 best = (err, a)
         a = best[1]
