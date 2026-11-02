@@ -400,6 +400,118 @@ plt.colorbar(im, ax=ax[2])
 fig.tight_layout(); fig.savefig(figs / "h1_trend.pdf"); fig.savefig(figs / "h1_trend.png", dpi=150)
 env.write_manifest(cfg, "04_h1", [tables / f for f in ["h1_primary.csv", "rq3_richness.csv",
                                                        "h1_exploratory_roi.csv", "h1_exploratory_channels.csv"]])'''),
+    md("""## 5. Post hoc: split by awakening type (exploratory)
+
+**Added after seeing section 1**, so this is an explanation to be tested elsewhere, not a confirmatory result.
+Sleep-onset (SO) awakenings wake people shortly after they fall asleep, so their last 45 s may track the
+descent into sleep rather than anything that precedes waking. SO awakenings exist only in the `subject` site,
+so site is dropped as a covariate within SO."""),
+    code('''roi["awakening_type"] = np.where(roi.tag_class == "SO", "sleep onset (SO)", "other")
+split = []
+for t, g in roi.groupby("awakening_type"):
+    cov = [c for c in hc["covariates"] if c != "site" or g.site.nunique() > 1]
+    for y in ["logpow_delta", "logpow_alpha", "logpow_beta", "ap_exponent"]:
+        split.append({"awakening_type": t, **stats.fit_trend(g, y, cov)})
+split = pd.DataFrame(split)
+split["p_fdr"] = stats.fdr_bh(split.p)
+split.to_csv(tables / "h1_posthoc_awakening_type.csv", index=False)
+print(split[["awakening_type", "y", "std_estimate", "ci_low", "ci_high", "p", "p_fdr", "n_awakenings",
+             "n_participants"]].round(4).to_string(index=False))
+
+fig, ax = plt.subplots(1, 4, figsize=(18, 3.8))
+for a, y in zip(ax, ["logpow_delta", "logpow_alpha", "logpow_beta", "ap_exponent"]):
+    for t, c in [("sleep onset (SO)", "#c0504d"), ("other", "#4a6fa5")]:
+        d = roi[(roi.awakening_type == t)].dropna(subset=[y]).copy()
+        d["centered"] = d[y] - d.groupby("sample_id")[y].transform("mean")
+        m = d.groupby("center_s").centered.agg(["mean", "sem"])
+        a.errorbar(m.index, m["mean"], yerr=1.96 * m["sem"], marker="o", color=c, capsize=3,
+                   label=f"{t} (n={d.sample_id.nunique()})")
+    a.axhline(0, color="grey", lw=.8, ls=":")
+    a.set(xlabel="epoch centre (s before awakening)", title=f"posterior {y}", ylabel="within-awakening change")
+ax[0].legend(fontsize=8)
+fig.suptitle("Post hoc (exploratory): pre-awakening change by awakening type")
+fig.tight_layout(); fig.savefig(figs / "h1_posthoc_awakening_type.pdf"); fig.savefig(figs / "h1_posthoc_awakening_type.png", dpi=150)'''),
+]
+
+NB05 = [
+    md("""# 05 · H2: is report content more decodable from the last 15 s?
+
+**H2:** dream-report content is decodable above chance from E4 (last 15 s) but not from earlier epochs.
+
+- **Target:** sentence embedding of each transcription (SBERT `all-mpnet-base-v2`, Reimers & Gurevych 2019; software).
+- **Features:** per epoch, the 7 spectral measures from NB3 × 16 channels.
+- **Model:** ridge regression, leave-one-participant-out (no participant is ever in train and test).
+- **Score:** for each held-out awakening, the percentile rank of its true report among all reports by cosine
+  similarity to the prediction. Nominal chance is 0.5, but ridge predictions lie in the span of the training
+  reports, which therefore look slightly closer to every prediction than the held-out one does: true chance sits
+  a little below 0.5 (about 0.47 with random embeddings). Every comparison is therefore against an **empirical
+  chance level**, the same score under the permutation null.
+- **Null:** 1000 runs with reports shuffled across awakenings; per-awakening null scores are kept, so any subset
+  (e.g. an awakening type) is tested against its own null. **E4 vs E2:** sign-flip test over participants,
+  plus an equivalence test (TOST, ±0.05) so a flat result can be stated rather than inferred from p > .05.
+
+Sample: awakenings with usable features in all of E2, E3, E4. E1 (22 'case' samples only) is left out.
+Runtime: CPU is enough; ~10-20 min for the permutations."""),
+    code(BOOTSTRAP),
+    code('''import json
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from d2i import data, decode, stats
+dc = cfg["h2"]
+der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+long = pd.read_csv(der / "features_long.csv")
+X, meta = decode.feature_matrices(long, dc["epochs"], dc["features"])
+print({e: x.shape for e, x in X.items()}, "| participants:", meta.participant.nunique())'''),
+    md("## 1. Report embeddings"),
+    code('''texts = {m["sample_id"]: m["transcription"] for m in data.load_meta(cfg)}
+emb_path = der / "report_embeddings.npz"
+if emb_path.exists():
+    z = np.load(emb_path, allow_pickle=True); E = dict(zip(z["sample_id"], z["emb"]))
+else:
+    E = decode.embed(texts, dc["text_model"])
+    np.savez(emb_path, sample_id=np.array(list(E)), emb=np.array(list(E.values())))
+Y = np.array([E[s] for s in meta.sample_id])
+groups = meta.participant.values
+print("embeddings", Y.shape)'''),
+    md("## 2. Decoding per epoch, with the permutation null"),
+    code('''rng = np.random.default_rng(cfg["seed"])
+perms = [rng.permutation(len(Y)) for _ in range(dc["n_perm"])]
+res, scores, nulls = [], {}, {}
+for e in dc["epochs"]:
+    scores[e] = decode.loso_rank(X[e], Y, groups, dc["alphas"])
+    nulls[e] = np.array([decode.loso_rank(X[e], Y[p], groups, dc["alphas"]) for p in perms])  # (n_perm, n)
+    res.append(decode.vs_null(scores[e], nulls[e], {"epoch": e}))
+    print(res[-1])
+np.savez_compressed(der / "h2_null_scores.npz", **{f"{e}_obs": scores[e] for e in scores}, **nulls)
+dec = pd.DataFrame(res)
+dec["p_holm"] = stats.holm(dec.p_perm)
+dec.to_csv(tables / "h2_decoding_by_epoch.csv", index=False)
+pd.DataFrame({"sample_id": meta.sample_id, "participant": groups, **scores}).to_csv(tables / "h2_rank_scores.csv", index=False)
+print(dec.round(4).to_string(index=False))'''),
+    md("## 3. E4 vs E2: difference test and equivalence test"),
+    code('''cmp = decode.paired_epoch_test(scores["E4"], scores["E2"], groups, dc["n_perm"], rng, dc["tost_bound"])
+pd.DataFrame([cmp]).to_csv(tables / "h2_e4_vs_e2.csv", index=False)
+print(json.dumps(cmp, indent=1, default=float))'''),
+    md("## 4. Post hoc: by awakening type (exploratory)"),
+    code('''meta["awakening_type"] = np.where(meta.tag_class == "SO", "sleep onset (SO)", "other")
+sub = pd.DataFrame([decode.vs_null(scores[e][m], nulls[e][:, m], {"awakening_type": t, "epoch": e})
+                    for t in meta.awakening_type.unique() for e in dc["epochs"]
+                    for m in [(meta.awakening_type == t).values]])
+sub["p_fdr"] = stats.fdr_bh(sub.p_perm)
+sub.to_csv(tables / "h2_posthoc_awakening_type.csv", index=False)
+print(sub.round(4).to_string(index=False))'''),
+    md("## 5. Figure"),
+    code('''fig, ax = plt.subplots(figsize=(6, 4))
+x = np.arange(len(dec))
+ax.bar(x, dec.above_chance, color="#4a6fa5", width=.6, label="observed - empirical chance")
+ax.scatter(x, dec.null_p95 - dec.null_mean, marker="_", s=600, color="#c0504d", label="null 95th percentile")
+ax.axhline(0, color="k", lw=.8, ls=":")
+ax.set(xticks=x, xticklabels=[f"{e}\\np_holm={p:.3f}" for e, p in zip(dec.epoch, dec.p_holm)],
+       ylabel="rank accuracy above empirical chance",
+       title="EEG -> report embedding, leave-one-participant-out")
+ax.legend(fontsize=8)
+fig.tight_layout(); fig.savefig(figs / "h2_decoding.pdf"); fig.savefig(figs / "h2_decoding.png", dpi=150)
+env.write_manifest(cfg, "05_h2", [tables / f for f in ["h2_decoding_by_epoch.csv", "h2_rank_scores.csv",
+                                                       "h2_e4_vs_e2.csv", "h2_posthoc_awakening_type.csv"]])'''),
 ]
 
 
@@ -423,4 +535,5 @@ if __name__ == "__main__":
     write("02_preprocess.ipynb", NB02)
     write("03_features.ipynb", NB03)
     write("04_h1.ipynb", NB04)
+    write("05_h2.ipynb", NB05)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))

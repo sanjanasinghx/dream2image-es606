@@ -87,6 +87,15 @@ h1:
   covariates: [site, reject_rate]        # also refit without reject_rate: pre-waking movement may be part of the effect
   alpha: 0.05                   # Holm across the two primary tests; FDR (BH) for the exploratory channel map
 
+# NB5: H2. Fixed before looking at any decoding result.
+h2:
+  epochs: [E2, E3, E4]
+  features: [logpow_delta, logpow_theta, logpow_alpha, logpow_sigma, logpow_beta, ap_exponent, ap_offset]
+  text_model: sentence-transformers/all-mpnet-base-v2
+  alphas: [0.1, 1, 10, 100, 1000, 10000, 100000]
+  n_perm: 1000
+  tost_bound: 0.05              # equivalence bound on the E4 - E2 rank-accuracy difference
+
 paths:                          # relative to the data root (Drive on Colab, D2I_DATA locally)
   hf: hf
   raw: raw
