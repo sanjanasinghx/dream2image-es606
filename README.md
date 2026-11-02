@@ -12,7 +12,8 @@ outputs live on Google Drive under `MyDrive/ES606_Dream2Image/`.
 | `notebooks/01_data.ipynb` | Download, per-row cache, structural checks, exclusions → `derived/step0.json` | CPU |
 
 Open a notebook in Colab (File → Open notebook → GitHub) or through the Colab extension in VS Code.
-Add a Hugging Face read token to Colab Secrets as `HF_TOKEN` first.
+Add to Colab Secrets first: `HF_TOKEN` (Hugging Face read token) and, while the repo is private,
+`GH_TOKEN` (fine-grained GitHub token, this repo only, Contents read-only).
 
 ## Layout
 

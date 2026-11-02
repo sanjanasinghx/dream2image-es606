@@ -8,16 +8,22 @@ from pathlib import Path
 NB_DIR = Path(__file__).resolve().parents[1] / "notebooks"
 
 BOOTSTRAP = '''# Bootstrap: same cell in every notebook. On Colab: mount Drive, get the repo, install extras.
-import os, sys, subprocess
+# The repo is private: add a read-only GitHub token to Colab Secrets as GH_TOKEN.
+import os, sys, subprocess, base64
 REPO_URL = "https://github.com/sanjanasinghx/dream2image-es606.git"
 if "google.colab" in sys.modules:
-    from google.colab import drive
+    from google.colab import drive, userdata
     drive.mount("/content/drive")
     REPO = "/content/dream2image-es606"
+    try:
+        auth = base64.b64encode(f"x-access-token:{userdata.get('GH_TOKEN')}".encode()).decode()
+        git = ["git", "-c", f"http.extraHeader=Authorization: Basic {auth}"]  # token never written to disk
+    except Exception:
+        git = ["git"]  # no secret: works once the repo is public
     if not os.path.exists(REPO):
-        subprocess.run(["git", "clone", "-q", REPO_URL, REPO], check=True)
+        subprocess.run([*git, "clone", "-q", REPO_URL, REPO], check=True)
     else:
-        subprocess.run(["git", "-C", REPO, "pull", "-q"], check=True)
+        subprocess.run([*git, "-C", REPO, "pull", "-q"], check=True)
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", f"{REPO}/requirements-colab.txt"], check=True)
 else:
     REPO = os.path.abspath("..")
@@ -38,8 +44,10 @@ NB00 = [
 Run once per new Colab runtime type, or whenever something breaks.
 Checks the hardware, installs extras, confirms gated Hugging Face access, and logs exact package versions to Drive.
 
-**Before running:** in Colab, open the key icon (Secrets) and add `HF_TOKEN` with a *read* token from
-huggingface.co/settings/tokens, and allow notebook access. You must have accepted the dataset's access conditions on its Hugging Face page."""),
+**Before running:** in Colab, open the key icon (Secrets) and add, with notebook access allowed:
+- `HF_TOKEN`: a *read* token from huggingface.co/settings/tokens
+- `GH_TOKEN`: a fine-grained GitHub token (github.com/settings/personal-access-tokens), repository access =
+  only `dream2image-es606`, permission Contents = Read-only. Not needed once the repo is public. You must have accepted the dataset's access conditions on its Hugging Face page."""),
     code(BOOTSTRAP),
     code('''# Hardware
 import psutil, shutil
