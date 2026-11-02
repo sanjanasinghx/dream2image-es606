@@ -23,7 +23,8 @@ if "google.colab" in sys.modules and not os.environ.get("D2I_HEADLESS"):  # head
     if not os.path.exists(REPO):
         subprocess.run([*git, "clone", "-q", REPO_URL, REPO], check=True)
     else:
-        subprocess.run([*git, "-C", REPO, "pull", "-q"], check=True)
+        subprocess.run([*git, "-C", REPO, "fetch", "-q", "origin"], check=True)
+        subprocess.run(["git", "-C", REPO, "reset", "-q", "--hard", "origin/main"], check=True)
     freeze = lambda: subprocess.run([sys.executable, "-m", "pip", "freeze"], capture_output=True, text=True).stdout
     before = freeze()
     subprocess.run([sys.executable, "-m", "pip", "install", "-q", "-r", f"{REPO}/requirements-colab.txt"], check=True)
