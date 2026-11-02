@@ -477,8 +477,9 @@ print("embeddings", Y.shape)'''),
 perms = [rng.permutation(len(Y)) for _ in range(dc["n_perm"])]
 res, scores, nulls = [], {}, {}
 for e in dc["epochs"]:
-    scores[e] = decode.loso_rank(X[e], Y, groups, dc["alphas"])
-    nulls[e] = np.array([decode.loso_rank(X[e], Y[p], groups, dc["alphas"]) for p in perms])  # (n_perm, n)
+    folds = decode.make_folds(X[e], groups)  # features fixed across permutations: decompose once
+    scores[e] = decode.loso_rank(folds, Y, dc["alphas"])
+    nulls[e] = np.array([decode.loso_rank(folds, Y[p], dc["alphas"]) for p in perms])  # (n_perm, n)
     res.append(decode.vs_null(scores[e], nulls[e], {"epoch": e}))
     print(res[-1])
 np.savez_compressed(der / "h2_null_scores.npz", **{f"{e}_obs": scores[e] for e in scores}, **nulls)
@@ -562,9 +563,9 @@ rr = rej.pivot_table(index="sample_id", columns="epoch", values="reject_rate").l
 rng = np.random.default_rng(cfg["seed"])
 perms = [rng.permutation(len(Y)) for _ in range(dc["n_perm"])]
 for e in dc["epochs"]:
-    Xa = rr[[e]].to_numpy()
-    obs = decode.loso_rank(Xa, Y, meta.participant.values, dc["alphas"])
-    null = np.array([decode.loso_rank(Xa, Y[p], meta.participant.values, dc["alphas"]) for p in perms])
+    folds = decode.make_folds(rr[[e]].to_numpy(), meta.participant.values)
+    obs = decode.loso_rank(folds, Y, dc["alphas"])
+    null = np.array([decode.loso_rank(folds, Y[p], dc["alphas"]) for p in perms])
     r = decode.vs_null(obs, null, {"control": "artifact-only decoding", "epoch": e})
     print(r)
     ctrl = pd.concat([ctrl, pd.DataFrame([r])])

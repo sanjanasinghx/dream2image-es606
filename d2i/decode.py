@@ -28,21 +28,43 @@ def embed(texts: dict, model_name: str) -> dict:
     return dict(zip(ids, vecs))
 
 
-def loso_rank(X: np.ndarray, Y: np.ndarray, groups: np.ndarray, alphas) -> np.ndarray:
-    """Percentile rank of each held-out awakening's true report among all reports (chance 0.5).
-    Features are standardised and the embeddings centred with training-fold statistics only."""
-    from sklearn.linear_model import RidgeCV
-    scores = np.empty(len(Y))
+def make_folds(X: np.ndarray, groups: np.ndarray) -> list[dict]:
+    """Leave-one-participant-out folds with the SVD of the standardised training features.
+    X is fixed across permutations (only the reports are shuffled), so this is computed once."""
+    folds = []
     for g in np.unique(groups):
         te, tr = groups == g, groups != g
         mu, sd = X[tr].mean(0), X[tr].std(0) + 1e-12
-        ym = Y[tr].mean(0)
-        pred = RidgeCV(alphas=alphas).fit((X[tr] - mu) / sd, Y[tr] - ym).predict((X[te] - mu) / sd)
+        U, s, Vt = np.linalg.svd((X[tr] - mu) / sd, full_matrices=False)
+        folds.append({"te": np.flatnonzero(te), "tr": tr, "U": U, "s": s,
+                      "XteV": ((X[te] - mu) / sd) @ Vt.T})
+    return folds
+
+
+def loso_rank(folds: list[dict], Y: np.ndarray, alphas) -> np.ndarray:
+    """Percentile rank of each held-out awakening's true report among all reports, by cosine similarity
+    to the ridge prediction. Ridge alpha per fold by generalised cross-validation on the training fold
+    (efficient leave-one-out, alpha shared across embedding dimensions); features standardised and
+    embeddings centred with training-fold statistics only."""
+    scores = np.empty(len(Y))
+    for f in folds:
+        ym = Y[f["tr"]].mean(0)
+        Yc = Y[f["tr"]] - ym
+        UtY = f["U"].T @ Yc
+        s2, best = f["s"] ** 2, None
+        for a in alphas:
+            shrink = s2 / (s2 + a)
+            h = (f["U"] ** 2) @ shrink
+            loo = (Yc - f["U"] @ (shrink[:, None] * UtY)) / (1 - h)[:, None]
+            err = np.mean(loo ** 2)
+            if best is None or err < best[0]:
+                best = (err, a)
+        a = best[1]
+        pred = f["XteV"] @ ((f["s"] / (s2 + a))[:, None] * UtY)
         C = Y - ym
         sim = (pred / np.linalg.norm(pred, axis=1, keepdims=True)) @ (C / np.linalg.norm(C, axis=1, keepdims=True)).T
-        for row, i in zip(sim, np.flatnonzero(te)):
-            others = np.delete(row, i)
-            scores[i] = np.mean(others < row[i])
+        true = sim[np.arange(len(f["te"])), f["te"]]
+        scores[f["te"]] = (sim < true[:, None]).sum(1) / (len(Y) - 1)  # the true report is never < itself
     return scores
 
 
