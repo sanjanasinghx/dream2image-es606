@@ -180,6 +180,145 @@ print(json.dumps({k: v for k, v in step0.items() if k != "retained"}, indent=1, 
 ]
 
 
+NB02 = [
+    md("""# 02 · Preprocessing
+
+Cuts E1-E4 (the last 15 s of each bin before awakening) from `eeg_120s` and cleans them with the October
+pipeline: 0.5-30 Hz FIR, bad-channel interpolation, average re-reference, and 2-s sub-window rejection with one
+robust threshold per sample, so E4 (which carries pre-waking movement) is judged by the same rule as E2.
+
+Output: `derived/clean/<sample>.npz` (signal + rejected-sample mask per epoch), `results/tables/reject_rates.csv`.
+Runtime: CPU, a few minutes. Resumable."""),
+    code(BOOTSTRAP),
+    code('''import json
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from joblib import Parallel, delayed
+from d2i import data, preprocess
+step0 = json.loads((env.path(cfg, "derived") / "step0.json").read_text())
+channels = [c for c in step0["primary_channels"] if c not in cfg["preprocess"]["drop_channels"]]
+out_dir = env.path(cfg, "derived") / "clean"; out_dir.mkdir(exist_ok=True)
+tables = env.path(cfg, "results") / "tables"
+figs = env.path(cfg, "results") / "figures"
+print(len(step0["retained"]), "samples,", len(channels), "channels")'''),
+    code('''def run(sid):
+    arrays, recs, chans = preprocess.process_sample(cfg, sid, data.load_eeg(cfg, sid), channels)
+    np.savez_compressed(out_dir / f"{sid}.npz", channels=np.array(channels), **arrays)
+    pd.DataFrame(recs).to_csv(out_dir / f"{sid}_epochs.csv", index=False)
+    pd.DataFrame(chans).to_csv(out_dir / f"{sid}_channels.csv", index=False)
+    return sid
+
+todo = [s for s in step0["retained"] if not (out_dir / f"{s}_channels.csv").exists()]
+print(f"{len(todo)} samples to process")
+Parallel(n_jobs=-1, verbose=5)(delayed(run)(s) for s in todo)'''),
+    code('''excl = pd.read_csv(tables / "sample_exclusions.csv")
+rej = pd.concat([pd.read_csv(out_dir / f"{s}_epochs.csv") for s in step0["retained"]])
+rej = rej.merge(excl[["sample_id", "participant", "site", "tag_class"]], on="sample_id")
+chq = pd.concat([pd.read_csv(out_dir / f"{s}_channels.csv") for s in step0["retained"]])
+rej.to_csv(tables / "reject_rates.csv", index=False)
+chq.to_csv(tables / "channel_quality.csv", index=False)
+summary = rej.groupby("epoch").agg(n=("reject_rate", "size"), reject_mean=("reject_rate", "mean"),
+                                   frac_any_reject=("reject_rate", lambda s: (s > 0).mean()),
+                                   interp_mean=("n_interp", "mean"), unusable=("usable", lambda s: (~s).sum()))
+summary.round(3).to_csv(tables / "reject_summary.csv")
+print(summary.round(3))
+print("sample-level bad channels:", chq.bad_reason.value_counts().to_dict())'''),
+    code('''fig, ax = plt.subplots(figsize=(6, 4))
+order = ["E1", "E2", "E3", "E4"]
+ax.boxplot([rej.loc[rej.epoch == e, "reject_rate"] for e in order], tick_labels=order, showfliers=False)
+for i, e in enumerate(order, 1):
+    y = rej.loc[rej.epoch == e, "reject_rate"]
+    ax.scatter(np.random.default_rng(0).normal(i, .06, len(y)), y, s=6, alpha=.4, color="#4a6fa5")
+ax.set(ylabel="fraction of epoch rejected", title="Artifact rejection by epoch (E4 = last 15 s)")
+fig.tight_layout(); fig.savefig(figs / "reject_by_epoch.pdf"); fig.savefig(figs / "reject_by_epoch.png", dpi=150)
+env.write_manifest(cfg, "02_preprocess", [tables / "reject_rates.csv", tables / "channel_quality.csv",
+                                          tables / "reject_summary.csv"],
+                   notes={"n_clean_files": len(list(out_dir.glob("s*.npz"))), "channels": channels})'''),
+]
+
+NB03 = [
+    md("""# 03 · Spectral features per epoch
+
+For every sample × epoch × channel: the power spectrum from clean 4-s segments, log band power
+(delta, theta, alpha, sigma, beta), and the aperiodic exponent and offset from specparam
+(Donoghue et al. 2020), fitted 1-30 Hz. The posterior average (O1, O2, Oz, P3, P4, Pz) follows the
+pre-awakening "hot zone" of Siclari et al. (2017).
+
+Output: `derived/features_long.csv`, `derived/features_roi.csv`, `derived/spectra.npz`.
+Runtime: CPU, a few minutes. No statistics here: tests come in NB4."""),
+    code(BOOTSTRAP),
+    code('''import json
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from d2i import features
+fc, fs = cfg["features"], cfg["dataset"]["sfreq"]
+step0 = json.loads((env.path(cfg, "derived") / "step0.json").read_text())
+clean = env.path(cfg, "derived") / "clean"
+tables = env.path(cfg, "results") / "tables"
+figs = env.path(cfg, "results") / "figures"
+rej = pd.read_csv(tables / "reject_rates.csv")'''),
+    md("## 1. Spectra and band power"),
+    code('''rows, spectra = [], []
+for _, r in rej.iterrows():
+    z = np.load(clean / f"{r.sample_id}.npz")
+    chans = list(z["channels"])
+    f, psd, n_seg = features.clean_psd(z[r.epoch], z[f"{r.epoch}_bad"], fs, fc["welch_win_s"], fc["welch_overlap_s"])
+    ok = r.usable and n_seg >= fc["min_clean_segments"]
+    bp = features.band_power(f, psd, fc["bands"]) if ok else {}
+    for i, c in enumerate(chans):
+        rows.append({**r[["sample_id", "participant", "site", "tag_class", "epoch", "center_s",
+                          "reject_rate"]].to_dict(),
+                     "channel": c, "n_clean_seg": n_seg, "ok": ok,
+                     **{k: (v[i] if ok else np.nan) for k, v in bp.items()}})
+        spectra.append(psd[i] if ok else np.full(len(f), np.nan))
+feat = pd.DataFrame(rows)
+fmask = (f >= 0.5) & (f <= 30)
+S = np.array(spectra)
+print(feat.groupby("epoch").ok.agg(["size", "mean"]).rename(columns={"size": "rows", "mean": "frac_ok"}))'''),
+    md("## 2. Aperiodic exponent (specparam)"),
+    code('''good = feat.ok.values
+ap = features.fit_aperiodic(f, S[good], fc)
+for k, v in ap.items():
+    feat.loc[good, k] = v
+print(f"fits: {good.sum()}, median R² = {np.median(ap['fit_r2']):.3f}, "
+      f"R² < {fc['min_r2']}: {(ap['fit_r2'] < fc['min_r2']).mean():.1%}, median peaks = {np.median(ap['n_peaks']):.0f}")
+print(feat.groupby("epoch")[["ap_exponent", "ap_offset"]].median().round(3))'''),
+    md("## 3. Save, plus the posterior ROI average"),
+    code('''der = env.path(cfg, "derived")
+feat.to_csv(der / "features_long.csv", index=False)
+np.savez_compressed(der / "spectra.npz", f=f, psd=S, sample_id=feat.sample_id.values,
+                    epoch=feat.epoch.values, channel=feat.channel.values)
+num = [c for c in feat.columns if c.startswith(("logpow_", "ap_"))] + ["fit_r2"]
+keys = ["sample_id", "participant", "site", "tag_class", "epoch", "center_s", "reject_rate"]
+roi = (feat[feat.channel.isin(fc["posterior_roi"]) & feat.ok]
+       .groupby(keys, dropna=False)[num].mean().reset_index())
+roi.to_csv(der / "features_roi.csv", index=False)
+print(roi.groupby("epoch")[["logpow_delta", "logpow_beta", "ap_exponent"]].agg(["count", "mean"]).round(3))'''),
+    md("## 4. Descriptive look (no inference)"),
+    code('''order = ["E1", "E2", "E3", "E4"]
+cols = dict(zip(order, ["#bbbbbb", "#9ecae1", "#4292c6", "#08306b"]))
+post = feat.channel.isin(fc["posterior_roi"]).values & feat.ok.values
+fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+# E1 exists only in the 'case' site (different hardware), so the spectrum panel uses those 22 samples
+# for every epoch: a within-recording comparison rather than a site comparison.
+case = (feat.site == "case").values
+for e in order:
+    m = post & case & (feat.epoch == e).values
+    if m.any():
+        ax[0].plot(f[fmask], np.log10(np.nanmean(S[m][:, fmask], 0)), color=cols[e], lw=2, label=e)
+ax[0].set(xlabel="Hz", ylabel="log10 power (z-units²/Hz)",
+          title=f"Posterior spectrum, 'case' site only (n={feat[case].sample_id.nunique()})"); ax[0].legend()
+for a, col, lab in [(ax[1], "logpow_delta", "log10 delta power (1-4 Hz)"), (ax[2], "ap_exponent", "aperiodic exponent")]:
+    d = roi[roi.epoch.isin(["E2", "E3", "E4"])].pivot_table(index="sample_id", columns="epoch", values=col)
+    a.plot(range(3), d[["E2", "E3", "E4"]].T, color="#4a6fa5", alpha=.15)
+    a.plot(range(3), d[["E2", "E3", "E4"]].mean(), color="k", lw=2.5, marker="o")
+    a.set(xticks=range(3), xticklabels=["E2\\n(-45..-30 s)", "E3\\n(-30..-15 s)", "E4\\n(-15..0 s)"],
+          ylabel=lab, title=f"Posterior {lab.split(' (')[0]}, one line per awakening")
+fig.tight_layout(); fig.savefig(figs / "features_by_epoch.pdf"); fig.savefig(figs / "features_by_epoch.png", dpi=150)
+env.write_manifest(cfg, "03_features", [der / "features_long.csv", der / "features_roi.csv"],
+                   notes={"n_rows": len(feat), "frac_ok": float(feat.ok.mean()),
+                          "median_r2": float(np.median(ap["fit_r2"]))})'''),
+]
+
+
 def write(name, cells):
     nb = {"cells": [], "metadata": {
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -197,4 +336,6 @@ def write(name, cells):
 if __name__ == "__main__":
     write("00_setup.ipynb", NB00)
     write("01_data.ipynb", NB01)
+    write("02_preprocess.ipynb", NB02)
+    write("03_features.ipynb", NB03)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))

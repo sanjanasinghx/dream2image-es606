@@ -47,6 +47,39 @@ epochs:
   epoch_len_s: 15.0
   primary_epochs: [E2, E3, E4]
 
+# NB2 preprocessing, carried over from the Oct 2026 pipeline (each choice checked there).
+# Order per sample: filter -> sample-level bad channels -> interpolate -> reference -> robust scale;
+# then per epoch: same filter -> channel-in-epoch bads -> interpolate -> reference -> sub-window rejection.
+preprocess:
+  drop_channels: [Cz]           # dead in every 'subject'-site recording
+  band: [0.5, 30.0]             # shared by both sites; above ~40 Hz the sites differ (NB1 section 7)
+  filter_pad: mean              # edge error on real epochs: 0.01 with mean padding vs 0.30 with reflect_limited
+  average_reference: true       # data were z-scored after an unknown reference: a re-reference, not a true average
+  bad_neighbor_r_min: 0.4       # sample-level bad channel: mean r with 3 nearest neighbours below this
+  reject_subwin_s: 2.0
+  # thresholds in robust units: 1.4826*MAD per sample x channel over the whole filtered recording, so
+  # every epoch of a sample faces the same threshold (E4 carries pre-waking movement; per-epoch scaling
+  # would give it a laxer threshold and bias E4-vs-E2)
+  ptp_threshold: 10.0
+  flat_threshold: 0.01
+  gradient_threshold: 5.0
+  channel_epoch_bad_frac: 0.5   # channel failing > this fraction of an epoch's sub-windows -> interpolate it
+  max_interp_frac: 0.25         # epoch with more interpolated channels -> unusable
+
+# NB3 features. Methods: Siclari et al. 2017 (pre-awakening posterior low-frequency power),
+# Donoghue et al. 2020 (specparam: aperiodic exponent separated from oscillatory peaks).
+features:
+  # 2-s segments (0.5 Hz resolution), 1-s step: 14 segments per 15-s epoch. With 4-s segments one rejected
+  # 2-s sub-window removes two of only six segments: complete E2-E4 samples drop from 109 to 76.
+  welch_win_s: 2.0
+  welch_overlap_s: 1.0          # step between segment starts
+  min_clean_segments: 4         # >= 5 s of clean signal; fewer -> features NaN
+  bands: {delta: [1, 4], theta: [4, 8], alpha: [8, 12], sigma: [12, 16], beta: [16, 30]}
+  specparam_range: [1, 30]
+  specparam: {peak_width_limits: [1, 8], max_n_peaks: 4, min_peak_height: 0.1, aperiodic_mode: fixed}
+  min_r2: 0.8                   # fits below this -> exponent NaN
+  posterior_roi: [O1, O2, Oz, P3, P4, Pz]   # Siclari et al. 2017 posterior "hot zone", as far as 16 channels allow
+
 paths:                          # relative to the data root (Drive on Colab, D2I_DATA locally)
   hf: hf
   raw: raw

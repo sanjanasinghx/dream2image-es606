@@ -10,6 +10,12 @@ outputs live on Google Drive under `MyDrive/ES606_Dream2Image/`.
 |---|---|---|
 | `notebooks/00_setup.ipynb` | Hardware check, extras install, gated-access check, version log | any |
 | `notebooks/01_data.ipynb` | Download, per-row cache, structural checks, exclusions → `derived/step0.json` | CPU |
+| `notebooks/02_preprocess.ipynb` | Epochs E1-E4, filtering, interpolation, artifact rejection → `derived/clean/` | CPU |
+| `notebooks/03_features.ipynb` | Band power and specparam aperiodic exponent per epoch × channel → `derived/features_*.csv` | CPU |
+
+To run later notebooks without a new Drive prompt each time, run them from an open notebook's runtime:
+`from d2i import runner; runner.run(["02_preprocess.ipynb", "03_features.ipynb"])`.
+Executed copies with outputs are saved to `results/notebooks/` on Drive.
 
 Open a notebook in Colab (File → Open notebook → GitHub) or through the Colab extension in VS Code.
 Add to Colab Secrets first: `HF_TOKEN` (Hugging Face read token) and, while the repo is private,
