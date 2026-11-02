@@ -515,6 +515,68 @@ env.write_manifest(cfg, "05_h2", [tables / f for f in ["h2_decoding_by_epoch.csv
 ]
 
 
+NB06 = [
+    md("""# 06 · Robustness controls and export
+
+Controls for the two main results, each answering one alternative explanation:
+
+1. **Flagged samples:** H1 without the 4 awakenings whose z-scale is set by an artifact elsewhere (NB1 section 8).
+2. **Site:** H1 within the `subject` site alone (site is fully confounded with E1 availability and hardware).
+3. **Artifact timing:** is E4 more artifact-laden than E2? (pre-waking movement)
+4. **Artifact-only decoding:** can the per-epoch rejection rate alone decode report content? Should be at chance.
+
+Then everything in `results/` on Drive is zipped for the GitHub repo."""),
+    code(BOOTSTRAP),
+    code('''import json, shutil
+import numpy as np, pandas as pd
+from d2i import data, decode, stats
+hc, dc = cfg["h1"], cfg["h2"]
+der, res_dir = env.path(cfg, "derived"), env.path(cfg, "results")
+tables = res_dir / "tables"
+step0 = json.loads((der / "step0.json").read_text())
+roi = pd.read_csv(der / "features_roi.csv")
+roi = roi[roi.epoch.isin(hc["epochs"])].assign(time30=lambda d: d.center_s / 30)
+rows = []'''),
+    md("## 1-2. H1 without flagged samples, and within one site"),
+    code('''for label, d, cov in [
+        ("all (primary)", roi, hc["covariates"]),
+        ("without scaling-flagged", roi[~roi.sample_id.isin(step0["scaling_flagged"])], hc["covariates"]),
+        ("subject site only", roi[roi.site == "subject"], ["reject_rate"])]:
+    for y in hc["primary"]:
+        rows.append({"control": label, **stats.fit_trend(d, y, cov)})
+ctrl = pd.DataFrame(rows)
+print(ctrl[["control", "y", "estimate", "ci_low", "ci_high", "p", "n_awakenings"]].round(4).to_string(index=False))'''),
+    md("## 3. Does artifact load rise toward awakening?"),
+    code('''rej = pd.read_csv(tables / "reject_rates.csv")
+rej = rej[rej.epoch.isin(hc["epochs"])].assign(time30=lambda d: d.center_s / 30)
+art = stats.fit_trend(rej, "reject_rate", ["site"])
+print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in art.items()})
+ctrl = pd.concat([ctrl, pd.DataFrame([{"control": "artifact rate trend", **art}])])'''),
+    md("## 4. Artifact-only decoding control"),
+    code('''long = pd.read_csv(der / "features_long.csv")
+X, meta = decode.feature_matrices(long, dc["epochs"], dc["features"])
+z = np.load(der / "report_embeddings.npz", allow_pickle=True)
+E = dict(zip(z["sample_id"], z["emb"]))
+Y = np.array([E[s] for s in meta.sample_id])
+rr = rej.pivot_table(index="sample_id", columns="epoch", values="reject_rate").loc[meta.sample_id]
+rng = np.random.default_rng(cfg["seed"])
+perms = [rng.permutation(len(Y)) for _ in range(dc["n_perm"])]
+for e in dc["epochs"]:
+    Xa = rr[[e]].to_numpy()
+    obs = decode.loso_rank(Xa, Y, meta.participant.values, dc["alphas"])
+    null = np.array([decode.loso_rank(Xa, Y[p], meta.participant.values, dc["alphas"]) for p in perms])
+    r = decode.vs_null(obs, null, {"control": "artifact-only decoding", "epoch": e})
+    print(r)
+    ctrl = pd.concat([ctrl, pd.DataFrame([r])])
+ctrl.to_csv(tables / "controls.csv", index=False)'''),
+    md("## 5. Export: zip `results/` for the GitHub repo"),
+    code('''zip_path = shutil.make_archive(str(env.data_root() / "results_export"), "zip", res_dir)
+env.write_manifest(cfg, "06_controls", [tables / "controls.csv"])
+print("wrote", zip_path, f"({os.path.getsize(zip_path) / 1e6:.1f} MB)")
+print("Download it from Drive (ES606_Dream2Image/results_export.zip) and unzip into the repo's results/ folder.")'''),
+]
+
+
 def write(name, cells):
     nb = {"cells": [], "metadata": {
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -536,4 +598,5 @@ if __name__ == "__main__":
     write("03_features.ipynb", NB03)
     write("04_h1.ipynb", NB04)
     write("05_h2.ipynb", NB05)
+    write("06_controls.ipynb", NB06)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))
