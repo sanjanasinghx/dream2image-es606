@@ -19,7 +19,7 @@ DRIVE_ROOT = Path("/content/drive/MyDrive/ES606_Dream2Image")
 
 
 def in_colab() -> bool:
-    return "google.colab" in sys.modules
+    return "google.colab" in sys.modules and not os.environ.get("D2I_HEADLESS")
 
 
 def data_root() -> Path:

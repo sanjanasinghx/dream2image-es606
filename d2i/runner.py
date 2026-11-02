@@ -18,7 +18,8 @@ from .env import REPO, data_root
 def run(notebooks: list[str], timeout_s: int = 3600) -> None:
     out = data_root() / "results" / "notebooks"
     out.mkdir(parents=True, exist_ok=True)
-    env = dict(os.environ, D2I_DATA=str(data_root()))  # the child kernel is not Colab: point it at Drive
+    # the child kernel skips the Colab bootstrap (Drive is already mounted, repo already pulled)
+    env = dict(os.environ, D2I_DATA=str(data_root()), D2I_HEADLESS="1")
     for nb in notebooks:
         t0 = time.time()
         r = subprocess.run([sys.executable, "-m", "jupyter", "nbconvert", "--to", "notebook", "--execute",

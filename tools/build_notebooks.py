@@ -11,7 +11,7 @@ BOOTSTRAP = '''# Bootstrap: same cell in every notebook. On Colab: mount Drive, 
 # The repo is private: add a read-only GitHub token to Colab Secrets as GH_TOKEN.
 import os, sys, subprocess, base64
 REPO_URL = "https://github.com/sanjanasinghx/dream2image-es606.git"
-if "google.colab" in sys.modules:
+if "google.colab" in sys.modules and not os.environ.get("D2I_HEADLESS"):  # headless = run by d2i.runner
     from google.colab import drive, userdata
     drive.mount("/content/drive")
     REPO = "/content/dream2image-es606"
@@ -319,6 +319,90 @@ env.write_manifest(cfg, "03_features", [der / "features_long.csv", der / "featur
 ]
 
 
+NB04 = [
+    md("""# 04 · H1: does the EEG change as awakening approaches?
+
+**H1:** within participants, posterior delta power and the aperiodic exponent fall from E2 to E4.
+Linear mixed model per measure over E2-E4: time (epoch centre, per 30 s) + site + artifact rate,
+random intercepts for participant and for awakening within participant. Holm across the two primary tests.
+
+**RQ3 (exploratory):** does the slope depend on report richness (log word count of the transcription)?
+
+Everything below the primary section is exploratory and labelled so."""),
+    code(BOOTSTRAP),
+    code('''import json
+import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from d2i import data, stats
+hc = cfg["h1"]
+der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+words = {m["sample_id"]: len((m.get("transcription") or "").split()) for m in data.load_meta(cfg)}
+def prep(df):
+    d = df[df.epoch.isin(hc["epochs"])].copy()
+    d["time30"] = d.center_s / 30.0
+    d["richness_z"] = np.log(d.sample_id.map(words))
+    d["richness_z"] = (d.richness_z - d.richness_z.mean()) / d.richness_z.std()
+    return d
+roi = prep(pd.read_csv(der / "features_roi.csv"))
+long = prep(pd.read_csv(der / "features_long.csv"))
+long = long[long.ok]
+print(f"ROI rows {len(roi)}, awakenings {roi.sample_id.nunique()}, participants {roi.participant.nunique()}")'''),
+    md("## 1. Primary test (confirmatory)"),
+    code('''rows = []
+for y in hc["primary"]:
+    rows.append(stats.fit_trend(roi, y, hc["covariates"]))
+    rows.append(stats.fit_trend(roi, y, [c for c in hc["covariates"] if c != "reject_rate"]))
+prim = pd.DataFrame(rows)
+main = prim.covariates == "+".join(hc["covariates"])
+prim.loc[main, "p_holm"] = stats.holm(prim.loc[main, "p"])
+prim.to_csv(tables / "h1_primary.csv", index=False)
+print(prim[["y", "covariates", "estimate", "ci_low", "ci_high", "std_estimate", "p", "p_holm",
+            "n_awakenings", "n_participants", "converged"]].round(4).to_string(index=False))'''),
+    md("## 2. RQ3: does the slope depend on report richness? (exploratory)"),
+    code('''rq3 = pd.DataFrame([stats.fit_trend(roi, y, hc["covariates"], interaction="richness_z") for y in hc["primary"]])
+rq3.to_csv(tables / "rq3_richness.csv", index=False)
+print("word count: median", int(np.median(list(words.values()))), "range", min(words.values()), "-", max(words.values()))
+print(rq3[["y", "term", "estimate", "ci_low", "ci_high", "p", "converged"]].round(4).to_string(index=False))'''),
+    md("## 3. All bands, posterior ROI, and the channel map (exploratory, FDR)"),
+    code('''measures = [c for c in roi.columns if c.startswith("logpow_")] + ["ap_exponent", "ap_offset"]
+expl = pd.DataFrame([stats.fit_trend(roi, y, hc["covariates"]) for y in measures])
+expl["p_fdr"] = stats.fdr_bh(expl.p)
+expl.to_csv(tables / "h1_exploratory_roi.csv", index=False)
+print(expl[["y", "std_estimate", "ci_low", "ci_high", "p", "p_fdr"]].round(4).to_string(index=False))
+
+chan = []
+for ch, g in long.groupby("channel"):
+    for y in ["logpow_delta", "logpow_alpha", "logpow_beta", "ap_exponent"]:
+        chan.append({"channel": ch, **stats.fit_trend(g, y, hc["covariates"])})
+chan = pd.DataFrame(chan)
+chan["p_fdr"] = stats.fdr_bh(chan.p)
+chan.to_csv(tables / "h1_exploratory_channels.csv", index=False)
+print("channel x measure tests surviving FDR:", int((chan.p_fdr < hc["alpha"]).sum()), "of", len(chan))'''),
+    md("## 4. Figure"),
+    code('''fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+labels = {"logpow_delta": "posterior log10 delta power", "ap_exponent": "posterior aperiodic exponent"}
+for a, y in zip(ax[:2], hc["primary"]):
+    d = roi.dropna(subset=[y]).copy()
+    d["centered"] = d[y] - d.groupby("sample_id")[y].transform("mean")  # within-awakening change
+    m = d.groupby("center_s").centered.agg(["mean", "sem"])
+    a.errorbar(m.index, m["mean"], yerr=1.96 * m["sem"], marker="o", color="k", capsize=4)
+    a.axhline(0, color="grey", lw=.8, ls=":")
+    r = prim[(prim.y == y) & main].iloc[0]
+    a.set(xlabel="epoch centre (s before awakening)", ylabel=f"{labels[y]}\\n(within-awakening, mean ± 95% CI)",
+          title=f"slope {r.estimate:+.3f} per 30 s, p_holm = {r.p_holm:.3g}")
+piv = chan.pivot(index="channel", columns="y", values="std_estimate")
+im = ax[2].imshow(piv.values, cmap="RdBu_r", vmin=-.3, vmax=.3, aspect="auto")
+sig = chan.pivot(index="channel", columns="y", values="p_fdr").values < hc["alpha"]
+for i, j in zip(*np.where(sig)):
+    ax[2].text(j, i, "*", ha="center", va="center")
+ax[2].set(xticks=range(piv.shape[1]), xticklabels=piv.columns, yticks=range(piv.shape[0]), yticklabels=piv.index,
+          title="Exploratory: standardised slope per 30 s (* FDR < .05)")
+plt.colorbar(im, ax=ax[2])
+fig.tight_layout(); fig.savefig(figs / "h1_trend.pdf"); fig.savefig(figs / "h1_trend.png", dpi=150)
+env.write_manifest(cfg, "04_h1", [tables / f for f in ["h1_primary.csv", "rq3_richness.csv",
+                                                       "h1_exploratory_roi.csv", "h1_exploratory_channels.csv"]])'''),
+]
+
+
 def write(name, cells):
     nb = {"cells": [], "metadata": {
         "kernelspec": {"display_name": "Python 3", "language": "python", "name": "python3"},
@@ -338,4 +422,5 @@ if __name__ == "__main__":
     write("01_data.ipynb", NB01)
     write("02_preprocess.ipynb", NB02)
     write("03_features.ipynb", NB03)
+    write("04_h1.ipynb", NB04)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))

@@ -80,6 +80,13 @@ features:
   min_r2: 0.8                   # fits below this -> exponent NaN
   posterior_roi: [O1, O2, Oz, P3, P4, Pz]   # Siclari et al. 2017 posterior "hot zone", as far as 16 channels allow
 
+# NB4: H1 and RQ3. Fixed before looking at any test result.
+h1:
+  epochs: [E2, E3, E4]          # all retained samples have these; E1 (case site only) is exploratory
+  primary: [logpow_delta, ap_exponent]   # posterior ROI; H1 predicts both fall toward awakening
+  covariates: [site, reject_rate]        # also refit without reject_rate: pre-waking movement may be part of the effect
+  alpha: 0.05                   # Holm across the two primary tests; FDR (BH) for the exploratory channel map
+
 paths:                          # relative to the data root (Drive on Colab, D2I_DATA locally)
   hf: hf
   raw: raw
