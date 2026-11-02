@@ -15,6 +15,17 @@ import time
 from .env import REPO, data_root
 
 
+def scrub(path) -> None:
+    """Replace machine-specific paths in an executed notebook so it can be published."""
+    from pathlib import Path
+    p = Path(path)
+    if p.exists():
+        text = p.read_text()
+        for local, label in [(str(data_root()), "<data root>"), (str(REPO), "<repo>"), (str(Path.home()), "~")]:
+            text = text.replace(local, label)
+        p.write_text(text)
+
+
 def run(notebooks: list[str], timeout_s: int = 3600) -> None:
     out = data_root() / "results" / "notebooks"
     out.mkdir(parents=True, exist_ok=True)
@@ -31,6 +42,7 @@ def run(notebooks: list[str], timeout_s: int = 3600) -> None:
                             str(REPO / "notebooks" / nb), "--output-dir", str(out),
                             f"--ExecutePreprocessor.timeout={timeout_s}"],
                            cwd=REPO / "notebooks", env=env, capture_output=True, text=True)
+        scrub(out / nb)
         status = "OK" if r.returncode == 0 else "FAILED"
         print(f"{nb}: {status} in {time.time() - t0:.0f}s -> {out / nb}")
         if r.returncode != 0:
