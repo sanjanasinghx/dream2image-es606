@@ -1,0 +1,6 @@
+# Installed on top of the Colab base image (numpy, scipy, pandas, sklearn, torch,
+# transformers, pyarrow, huggingface_hub, matplotlib, pyyaml are already there; not re-pinned
+# so Colab's own builds are not broken). Exact versions used are logged by NB0.
+mne>=1.8,<1.14
+yasa>=0.6.5
+specparam>=2.0.0rc1

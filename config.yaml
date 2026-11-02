@@ -1,0 +1,54 @@
+# Dream2Image (ES606) — single source of truth for every parameter.
+# Decisions marked [verified Oct 2026] were checked against the data in the first local
+# pipeline (Desktop/Sem 3/Dream2Image, Step 0) and are re-checked by notebooks/01_data.ipynb.
+
+seed: 20251006
+
+dataset:
+  hf_id: opsecsystems/Dream2Image
+  # The repo holds the same rows twice (data/*.parquet shards and train/data.parquet);
+  # only the shards are downloaded.
+  parquet_glob: data/train-*.parquet
+  expected_n_rows: 129
+  name_col: title
+  total_col: eeg_120s
+  window_cols: {15: eeg_15s, 30: eeg_30s, 60: eeg_60s}
+  text_cols: [transcription, description]
+  image_col: image              # never loaded: DALL-E 3 renders of the transcripts, no brain information
+  sfreq: 400.0
+  # [verified Oct 2026] order is spatially plausible: corr-vs-distance rho = 0.87, perm p < 0.001
+  channels: [C3, C4, Cz, F3, F4, F7, F8, Fp1, Fp2, Fpz, Fz, O1, O2, Oz, P3, P4, Pz]
+  dead_sd_floor: 1.0e-6         # channel SD below this over the total = dead (all zeros)
+
+participant:
+  expected_n: 38                # paper's count; NB1 asserts the parsed count against it
+
+checks:
+  zscore_mean_tol: 0.05
+  zscore_sd_tol: 0.05
+  identical_atol: 1.0e-6
+  affine_min_r: 0.999
+  misaligned_stop_fraction: 0.10
+  n_perm_channel_order: 5000
+  primary_channel_min_frac: 0.95   # channel enters the primary set if live in >= this fraction of retained samples
+  scaling_flag_sd: 0.25            # flag sample if any primary epoch has median channel SD below this (sensitivity only)
+  psd_win_s: 4.0
+
+exclusions:
+  drop_nesting_misaligned: true
+  drop_channel_count_not: 17
+
+# Epochs, seconds relative to awakening; each epoch = last 15 s of its bin.
+epochs:
+  E1: [-120, -60]               # only the 'case' site has 120 s -> exploratory
+  E2: [-60, -30]
+  E3: [-30, -15]
+  E4: [-15, 0]
+  epoch_len_s: 15.0
+  primary_epochs: [E2, E3, E4]
+
+paths:                          # relative to the data root (Drive on Colab, D2I_DATA locally)
+  hf: hf
+  raw: raw
+  derived: derived
+  results: results
