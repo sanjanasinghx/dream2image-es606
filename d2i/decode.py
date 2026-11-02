@@ -83,13 +83,14 @@ def vs_null(obs: np.ndarray, null: np.ndarray, label: dict) -> dict:
 
 def paired_epoch_test(a: np.ndarray, b: np.ndarray, groups: np.ndarray, n_perm: int, rng, bound: float) -> dict:
     """Mean of per-participant (a - b): sign-flip permutation p (two-sided) and TOST equivalence p
-    against +/- bound (Lakens 2017), both with participants as the unit."""
+    against +/- bound (Lakens 2017), both with participants as the unit. The CI is 90%, the interval
+    that matches TOST at alpha = .05."""
     from scipy import stats as st
     diff = pd.Series(a - b).groupby(groups).mean().to_numpy()
     obs = diff.mean()
     flips = rng.choice([-1, 1], size=(n_perm, len(diff)))
     null = (flips * diff).mean(1)
-    lo, hi = st.t.interval(0.95, len(diff) - 1, loc=obs, scale=st.sem(diff))
+    lo, hi = st.t.interval(0.90, len(diff) - 1, loc=obs, scale=st.sem(diff))
     p_lower = st.ttest_1samp(diff, -bound, alternative="greater").pvalue
     p_upper = st.ttest_1samp(diff, bound, alternative="less").pvalue
     return {"mean_diff": obs, "ci_low": lo, "ci_high": hi,

@@ -1,14 +1,14 @@
 {
   "step": "06_controls",
-  "created": "2026-11-02T05:38:14",
+  "created": "2026-11-02T13:28:58",
   "runtime": "local",
-  "python": "3.13.18",
+  "python": "3.12.7",
   "seed": 20251006,
-  "config_sha": "590ed9aeb72c12f2",
+  "config_sha": "2f066a9af1da6107",
   "outputs": [
     {
       "path": "results/tables/controls.csv",
-      "sha256_16": "6d1dd3b7ccb00c6c"
+      "sha256_16": "c794363610bc9bdd"
     }
   ],
   "notes": {}

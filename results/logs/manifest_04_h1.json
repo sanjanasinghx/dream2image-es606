@@ -1,26 +1,26 @@
 {
   "step": "04_h1",
-  "created": "2026-11-02T04:19:52",
+  "created": "2026-11-02T13:25:18",
   "runtime": "local",
-  "python": "3.13.18",
+  "python": "3.12.7",
   "seed": 20251006,
-  "config_sha": "590ed9aeb72c12f2",
+  "config_sha": "2f066a9af1da6107",
   "outputs": [
     {
       "path": "results/tables/h1_primary.csv",
-      "sha256_16": "9e505e91a658f55a"
+      "sha256_16": "d2efb2670271c0a2"
     },
     {
       "path": "results/tables/rq3_richness.csv",
-      "sha256_16": "578869eedf4c93d4"
+      "sha256_16": "0b262eef14f09b5b"
     },
     {
       "path": "results/tables/h1_exploratory_roi.csv",
-      "sha256_16": "eb443377a5bd06dc"
+      "sha256_16": "9b992a677a0789a5"
     },
     {
       "path": "results/tables/h1_exploratory_channels.csv",
-      "sha256_16": "c1078aa076e3113c"
+      "sha256_16": "4c48be8056a9b48f"
     }
   ],
   "notes": {}

@@ -1,10 +1,10 @@
 {
   "step": "05_h2",
-  "created": "2026-11-02T11:38:23",
+  "created": "2026-11-02T13:28:19",
   "runtime": "local",
   "python": "3.12.7",
   "seed": 20251006,
-  "config_sha": "590ed9aeb72c12f2",
+  "config_sha": "2f066a9af1da6107",
   "outputs": [
     {
       "path": "results/tables/h2_decoding_by_epoch.csv",
@@ -16,7 +16,7 @@
     },
     {
       "path": "results/tables/h2_e4_vs_e2.csv",
-      "sha256_16": "6850af4e41e6f354"
+      "sha256_16": "e1235cf4da7218a4"
     },
     {
       "path": "results/tables/h2_posthoc_awakening_type.csv",
