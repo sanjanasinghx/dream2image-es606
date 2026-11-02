@@ -50,7 +50,8 @@ outputs in `results/notebooks/`, run manifests in `results/logs/`.
 **Colab.** Add to Colab Secrets: `HF_TOKEN` (Hugging Face read token). Open `notebooks/run_pipeline.ipynb`,
 set `NOTEBOOKS`, Run all. Data and outputs go to `MyDrive/ES606_Dream2Image/`.
 
-**Local.** NB4-NB6 need only the small derived files:
+**Local.** NB4-NB6 skip the EEG but need, from the Drive folder: `derived/`, the metadata files
+`raw/s*.json` (report word counts) and the `results/tables/` written by NB1-NB2.
 
 ```bash
 python3 -m venv .venv && .venv/bin/pip install -r requirements-local.txt

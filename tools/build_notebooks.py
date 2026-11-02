@@ -239,7 +239,7 @@ env.write_manifest(cfg, "02_preprocess", [tables / "reject_rates.csv", tables / 
 NB03 = [
     md("""# 03 · Spectral features per epoch
 
-For every sample × epoch × channel: the power spectrum from clean 4-s segments, log band power
+For every sample × epoch × channel: the power spectrum from clean 2-s segments (1-s step), log band power
 (delta, theta, alpha, sigma, beta), and the aperiodic exponent and offset from specparam
 (Donoghue et al. 2020), fitted 1-30 Hz. The posterior average (O1, O2, Oz, P3, P4, Pz) follows the
 pre-awakening "hot zone" of Siclari et al. (2017).
@@ -336,6 +336,7 @@ import numpy as np, pandas as pd, matplotlib.pyplot as plt
 from d2i import data, stats
 hc = cfg["h1"]
 der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
 words = {m["sample_id"]: len((m.get("transcription") or "").split()) for m in data.load_meta(cfg)}
 def prep(df):
     d = df[df.epoch.isin(hc["epochs"])].copy()
@@ -445,7 +446,7 @@ NB05 = [
 - **Score:** for each held-out awakening, the percentile rank of its true report among all reports by cosine
   similarity to the prediction. Nominal chance is 0.5, but ridge predictions lie in the span of the training
   reports, which therefore look slightly closer to every prediction than the held-out one does: true chance sits
-  a little below 0.5 (about 0.47 with random embeddings). Every comparison is therefore against an **empirical
+  a little below 0.5 (the permutation null means below are about 0.50). Every comparison is therefore against an **empirical
   chance level**, the same score under the permutation null.
 - **Null:** 1000 runs with reports shuffled across awakenings; per-awakening null scores are kept, so any subset
   (e.g. an awakening type) is tested against its own null. **E4 vs E2:** sign-flip test over participants,
@@ -459,6 +460,7 @@ import numpy as np, pandas as pd, matplotlib.pyplot as plt
 from d2i import data, decode, stats
 dc = cfg["h2"]
 der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
 long = pd.read_csv(der / "features_long.csv")
 X, meta = decode.feature_matrices(long, dc["epochs"], dc["features"])
 print({e: x.shape for e, x in X.items()}, "| participants:", meta.participant.nunique())'''),
@@ -570,7 +572,7 @@ import numpy as np, pandas as pd
 from d2i import data, decode, stats
 hc, dc = cfg["h1"], cfg["h2"]
 der, res_dir = env.path(cfg, "derived"), env.path(cfg, "results")
-tables = res_dir / "tables"
+tables = res_dir / "tables"; tables.mkdir(exist_ok=True)
 step0 = json.loads((der / "step0.json").read_text())
 roi = pd.read_csv(der / "features_roi.csv")
 roi = roi[roi.epoch.isin(hc["epochs"])].assign(time30=lambda d: d.center_s / 30)

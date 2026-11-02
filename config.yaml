@@ -1,6 +1,6 @@
-# Dream2Image (ES606) — single source of truth for every parameter.
+# Dream2Image (ES606): all analysis parameters.
 # Decisions marked [verified Oct 2026] were checked against the data in the first local
-# pipeline (Desktop/Sem 3/Dream2Image, Step 0) and are re-checked by notebooks/01_data.ipynb.
+# pipeline (Step 0) and are re-checked by notebooks/01_data.ipynb.
 
 seed: 20251006
 

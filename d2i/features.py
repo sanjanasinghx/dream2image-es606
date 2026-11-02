@@ -1,6 +1,6 @@
 """Per-epoch spectral features.
 
-Power spectrum: Welch-style average of Hann-windowed 4-s segments (2-s step) that do not touch a
+Power spectrum: Welch-style average of Hann-windowed 2-s segments (1-s step) that do not touch a
 rejected sample. Band power is log10 of the integrated spectrum. The aperiodic exponent and offset
 come from specparam (Donoghue et al. 2020), fitted 1-30 Hz with peaks modelled separately.
 """
