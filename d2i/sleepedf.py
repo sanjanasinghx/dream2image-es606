@@ -15,7 +15,7 @@ STAGES = {"Sleep stage W": "W", "Sleep stage 1": "1", "Sleep stage 2": "2", "Sle
 SLEEP = {"1", "2", "3", "4", "R"}
 
 
-def fetch(subjects, recording: int, path=None, retries: int = 4) -> tuple[list[tuple[int, str, str]], list[dict]]:
+def fetch(subjects, recording: int, path=None, base_url: str | None = None, retries: int = 4) -> tuple[list[tuple[int, str, str]], list[dict]]:
     """(subject, psg, hypnogram) for every subject that has this night, plus a record of the subjects
     that are absent from the study or could not be downloaded. PhysioNet times out now and then, so each
     subject is retried; a subject is only dropped after `retries` failed attempts, and that is logged."""
@@ -25,7 +25,8 @@ def fetch(subjects, recording: int, path=None, retries: int = 4) -> tuple[list[t
     for s in subjects:
         for attempt in range(1, retries + 1):
             try:
-                files = fetch_data([s], recording=[recording], path=path, on_missing="ignore", verbose=False)
+                kw = {"base_url": base_url} if base_url else {}
+                files = fetch_data([s], recording=[recording], path=path, on_missing="ignore", verbose=False, **kw)
                 break
             except ValueError:  # subject or night not in the cassette study
                 files, err = [], "not in study"

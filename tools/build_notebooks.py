@@ -770,7 +770,7 @@ der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables
 tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
 raw_dir = os.environ.get("D2I_SLEEPEDF") or ("/content/sleep_physionet" if Path("/content").is_dir() else None)
 subjects = range(83) if sc["subjects"] == "all" else sc["subjects"]
-files, missing = sleepedf.fetch(subjects, sc["recording"], raw_dir)
+files, missing = sleepedf.fetch(subjects, sc["recording"], raw_dir, sc["base_url"])
 print(len(files), "recordings;", len(missing), "subjects without one:", pd.DataFrame(missing).reason.value_counts().to_dict() if missing else {})'''),
     md("## 1. Onset, windows, features"),
     code('''rows, spectra, recs = [], [], []

@@ -112,6 +112,8 @@ benchmark:
 sleepedf:
   subjects: all                 # every Sleep Cassette subject (0-82; missing ones are skipped)
   recording: 1                  # first night only: one recording per subject
+  # PhysioNet's AWS mirror: same files (MNE checks every file's SHA-1); physionet.org stalls from Colab
+  base_url: https://physionet-open.s3.amazonaws.com/sleep-edfx/1.0.0/sleep-cassette
   channel: EEG Pz-Oz            # posterior, closest to the Dream2Image ROI; 100 Hz
   stage_epoch_s: 30.0           # hypnogram resolution (R&K): onset is known only to +/- 30 s
   # onset = first 30-s epoch scored stage 1 or 2 that starts >= 3 consecutive non-wake epochs
