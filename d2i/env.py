@@ -77,7 +77,8 @@ def write_manifest(cfg: dict, step: str, outputs, notes: dict | None = None) -> 
     out = {
         "step": step,
         "created": dt.datetime.now().isoformat(timespec="seconds"),
-        "runtime": "colab" if in_colab() else "local",
+        # not in_colab(): runner children set D2I_HEADLESS, which would label Colab runs "local"
+        "runtime": "colab" if ("google.colab" in sys.modules or "COLAB_RELEASE_TAG" in os.environ) else "local",
         "python": platform.python_version(),
         "seed": cfg["seed"],
         "config_sha": _sha(CONFIG_PATH),
