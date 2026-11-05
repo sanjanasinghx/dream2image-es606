@@ -5,3 +5,4 @@ mne>=1.8,<1.14
 yasa>=0.6.5
 specparam>=2.0.0rc1
 sentence-transformers>=3.0
+pyriemann>=0.6

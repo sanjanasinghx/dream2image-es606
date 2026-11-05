@@ -9,3 +9,7 @@ matplotlib
 pyyaml
 nbconvert
 ipykernel
+# NB7-NB8 (optional locally; Colab installs these via requirements-colab.txt)
+mne>=1.8,<1.14
+specparam>=2.0.0rc1
+pyriemann>=0.6

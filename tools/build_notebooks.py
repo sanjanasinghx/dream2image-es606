@@ -399,9 +399,7 @@ for i, j in zip(*np.where(sig)):
 ax[2].set(xticks=range(piv.shape[1]), xticklabels=piv.columns, yticks=range(piv.shape[0]), yticklabels=piv.index,
           title="Exploratory: standardised slope per 30 s (* FDR < .05)")
 plt.colorbar(im, ax=ax[2])
-fig.tight_layout(); fig.savefig(figs / "h1_trend.pdf"); fig.savefig(figs / "h1_trend.png", dpi=150)
-env.write_manifest(cfg, "04_h1", [tables / f for f in ["h1_primary.csv", "rq3_richness.csv",
-                                                       "h1_exploratory_roi.csv", "h1_exploratory_channels.csv"]])'''),
+fig.tight_layout(); fig.savefig(figs / "h1_trend.pdf"); fig.savefig(figs / "h1_trend.png", dpi=150)'''),
     md("""## 5. Post hoc: split by awakening type (exploratory)
 
 **Added after seeing section 1**, so this is an explanation to be tested elsewhere, not a confirmatory result.
@@ -433,6 +431,38 @@ for a, y in zip(ax, ["logpow_delta", "logpow_alpha", "logpow_beta", "ap_exponent
 ax[0].legend(fontsize=8)
 fig.suptitle("Post hoc (exploratory): pre-awakening change by awakening type")
 fig.tight_layout(); fig.savefig(figs / "h1_posthoc_awakening_type.pdf"); fig.savefig(figs / "h1_posthoc_awakening_type.png", dpi=150)'''),
+    md("""## 6. Sensitivity of the time effect (added after review)
+
+**Not pre-specified.** The models above give each participant and awakening its own intercept but one shared
+slope. When slopes differ between people, that understates the uncertainty of the time effect
+(Barr et al. 2013). Two checks, for the pooled sample and for each group separately:
+
+- the same model plus a **random time slope per participant**;
+- a **model-free sign-flip test**: least-squares slope within each awakening, averaged per participant,
+  signs flipped at random over participants (no model assumptions, participants as the unit).
+
+Groups: all; sleep onset (SO, `subject` site only); `subject` site without SO (Morning, NREM, REM);
+`case` site (awakening stage not tagged). The sign-flip test does not adjust for covariates."""),
+    code('''srng = np.random.default_rng(cfg["seed"])
+groups = {"all": (roi, hc["covariates"]),
+          "sleep onset (SO)": (roi[roi.tag_class == "SO"], ["reject_rate"]),
+          "subject site, not SO": (roi[(roi.site == "subject") & (roi.tag_class != "SO")], ["reject_rate"]),
+          "case site (stage untagged)": (roi[roi.site == "case"], ["reject_rate"])}
+sens = []
+for name, (d, cov) in groups.items():
+    for y in ["ap_exponent", "logpow_delta", "logpow_alpha"]:
+        sens.append({"group": name, "model": "random intercepts (pre-specified)", **stats.fit_trend(d, y, cov)})
+        sens.append({"group": name, "model": "+ random slope per participant",
+                     **stats.fit_trend(d, y, cov, random_slope=True)})
+        sens.append({"group": name, "model": "sign-flip over participants",
+                     **stats.signflip_slopes(d, y, hc["n_signflip"], srng)})
+sens = pd.DataFrame(sens)
+sens.to_csv(tables / "h1_sensitivity.csv", index=False)
+print(sens[["group", "y", "model", "estimate", "p", "n_awakenings", "n_participants", "converged"]]
+      .round(4).to_string(index=False))
+env.write_manifest(cfg, "04_h1", [tables / f for f in ["h1_primary.csv", "rq3_richness.csv", "h1_exploratory_roi.csv",
+                                                       "h1_exploratory_channels.csv", "h1_posthoc_awakening_type.csv",
+                                                       "h1_sensitivity.csv"]])'''),
 ]
 
 NB05 = [
@@ -562,7 +592,7 @@ Controls for the two main results, each answering one alternative explanation:
 
 1. **Flagged samples:** H1 without the 4 awakenings whose z-scale is set by an artifact elsewhere (NB1 section 8).
 2. **Site:** H1 within the `subject` site alone (site is fully confounded with E1 availability and hardware).
-3. **Artifact timing:** is E4 more artifact-laden than E2? (pre-waking movement)
+3. **Artifact timing:** is E4 more artifact-laden than E2? (pre-waking movement) Pooled, then per site.
 4. **Artifact-only decoding:** can the per-epoch rejection rate alone decode report content? Should be at chance.
 
 Then everything in `results/` on Drive is zipped for the GitHub repo."""),
@@ -591,7 +621,12 @@ print(ctrl[["control", "y", "estimate", "ci_low", "ci_high", "p", "n_awakenings"
 rej = rej[rej.epoch.isin(hc["epochs"])].assign(time30=lambda d: d.center_s / 30)
 art = stats.fit_trend(rej, "reject_rate", ["site"])
 print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in art.items()})
-ctrl = pd.concat([ctrl, pd.DataFrame([{"control": "artifact rate trend", **art}])])'''),
+ctrl = pd.concat([ctrl, pd.DataFrame([{"control": "artifact rate trend", **art}])])
+# added after review: the pooled test is dominated by the 100 'subject' awakenings, so each site on its own
+for s, g in rej.groupby("site"):
+    a = stats.fit_trend(g, "reject_rate", [])
+    print(s, {k: (round(v, 4) if isinstance(v, float) else v) for k, v in a.items()})
+    ctrl = pd.concat([ctrl, pd.DataFrame([{"control": f"artifact rate trend, {s} site", **a}])])'''),
     md("## 4. Artifact-only decoding control"),
     code('''long = pd.read_csv(der / "features_long.csv")
 X, meta = decode.feature_matrices(long, dc["epochs"], dc["features"])
@@ -617,6 +652,205 @@ print("Download it from Drive (ES606_Dream2Image/results_export.zip) and unzip i
 ]
 
 
+NB07 = [
+    md("""# 07 · Benchmark: does a standard strong EEG decoder escape the category confound?
+
+**Added after the H2 results; settings fixed in `config.yaml` (`benchmark`) before this notebook first ran.**
+
+NB5 found that spectral features decode report embeddings above a free-shuffle null, but not beyond what site
+and awakening type explain. Is that a weakness of the spectral features, or of the data? This notebook swaps
+in a standard strong EEG representation and keeps everything else identical to NB5:
+
+- **Decoder:** Riemannian tangent space (Barachant et al. 2012) + the same ridge. Per epoch, the 16 × 16
+  channel covariance of the cleaned signal (non-rejected samples only, OAS shrinkage: the average reference and
+  interpolation make raw covariances singular), projected to the tangent space at the Riemannian mean of the
+  **training participants only**, refitted in every fold.
+- **Same as NB5:** the 101 awakenings, leave-one-participant-out folds, SBERT targets, rank-accuracy score,
+  1000 free-shuffle permutations (the same permutations), and 1000 permutations within site × awakening type.
+
+Reading: above the free-shuffle null but at chance within category → the confound belongs to the data, not to
+one feature set. Above the within-category null → content information that NB5's features missed."""),
+    code(BOOTSTRAP),
+    code('''import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from d2i import decode, stats
+dc, bc = cfg["h2"], cfg["benchmark"]
+der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
+X, meta = decode.feature_matrices(pd.read_csv(der / "features_long.csv"), dc["epochs"], dc["features"])  # NB5's rows
+z = np.load(der / "report_embeddings.npz", allow_pickle=True)
+E = dict(zip(z["sample_id"], z["emb"]))
+Y = np.array([E[s] for s in meta.sample_id])
+groups = meta.participant.values
+print("awakenings", len(Y), "| participants", meta.participant.nunique())'''),
+    md("## 1. Channel covariances of the cleaned epochs"),
+    code('''covs, chans = {e: [] for e in dc["epochs"]}, None
+for s in meta.sample_id:
+    c = np.load(der / "clean" / f"{s}.npz")
+    chans = chans or list(c["channels"])
+    assert list(c["channels"]) == chans, s
+    for e in dc["epochs"]:
+        covs[e].append(decode.clean_covariance(c[e], c[f"{e}_bad"], bc["cov_estimator"]))
+covs = {e: np.array(v) for e, v in covs.items()}
+for e, C in covs.items():
+    print(e, C.shape, "smallest eigenvalue", f"{np.linalg.eigvalsh(C).min():.2e}")'''),
+    md("## 2. Decoding against both nulls"),
+    code('''rng = np.random.default_rng(cfg["seed"])
+perms = [rng.permutation(len(Y)) for _ in range(dc["n_perm"])]  # same draws as NB5's free shuffle
+meta["stratum"] = meta.site + "_" + meta.tag_class.fillna("case")
+strata = list(meta.groupby("stratum").indices.values())
+srng = np.random.default_rng(cfg["seed"] + 1)
+def strat_perm():
+    p = np.arange(len(Y))
+    for idx in strata:
+        p[idx] = srng.permutation(idx)
+    return p
+sperms = [strat_perm() for _ in range(dc["n_perm"])]
+rows = []
+for e in dc["epochs"]:
+    folds = decode.make_folds(covs[e], groups, fit_transform=decode.tangent_space(covs[e]))
+    obs = decode.loso_rank(folds, Y, dc["alphas"])
+    for null_name, P in [("free shuffle", perms), ("within site x awakening type", sperms)]:
+        null = np.array([decode.loso_rank(folds, Y[p], dc["alphas"]) for p in P])
+        rows.append(decode.vs_null(obs, null, {"decoder": "Riemannian tangent space", "epoch": e, "null": null_name}))
+        print({k: (round(v, 4) if isinstance(v, float) else v) for k, v in rows[-1].items()})'''),
+    md("## 3. Side by side with NB5 (spectral features) and the category-only baseline"),
+    code('''nb5 = pd.read_csv(tables / "h2_decoding_by_epoch.csv").assign(decoder="spectral features (NB5)", null="free shuffle")
+conf = pd.read_csv(tables / "h2_confound_control.csv")
+within = conf[conf.model.str.startswith("EEG")].assign(decoder="spectral features (NB5)",
+                                                         epoch=lambda d: d.model.str[-2:])
+cat = conf[conf.model.str.startswith("category")].assign(decoder="category labels only (no EEG)", epoch="-")
+cols = ["decoder", "epoch", "null", "rank_acc", "null_mean", "above_chance", "null_p95", "p_perm", "n"]
+bench = pd.concat([pd.DataFrame(rows), nb5, within, cat])[cols].reset_index(drop=True)
+for (d, n), g in bench.groupby(["decoder", "null"]):
+    bench.loc[g.index, "p_holm"] = stats.holm(g.p_perm)  # across the 3 epochs of each decoder x null
+bench.to_csv(tables / "benchmark_h2.csv", index=False)
+print(bench.round(4).to_string(index=False))'''),
+    md("## 4. Figure"),
+    code('''fig, ax = plt.subplots(1, 2, figsize=(12, 4.2), sharey=True)
+dec = [("spectral features (NB5)", "#4a6fa5"), ("Riemannian tangent space", "#2ca25f")]
+x = np.arange(len(dc["epochs"]))
+for a, null_name in zip(ax, ["free shuffle", "within site x awakening type"]):
+    for k, (d, c) in enumerate(dec):
+        g = bench[(bench.decoder == d) & (bench.null == null_name)].set_index("epoch").loc[dc["epochs"]]
+        a.bar(x + (k - .5) * .38, g.above_chance, width=.36, color=c, label=d)
+        for xi, (v, p) in enumerate(zip(g.above_chance, g.p_holm)):
+            a.text(xi + (k - .5) * .38, max(v, 0) + .004, f"p={p:.3f}", ha="center", fontsize=7)
+    a.axhline(0, color="k", lw=.8)
+    a.set(xticks=x, xticklabels=dc["epochs"], title=f"null: {null_name}")
+ax[0].axhline(cat.above_chance.iloc[0], color="#e08214", ls="--", lw=1, label="category labels alone, no EEG")
+ax[0].set(ylabel="rank accuracy above the null mean"); ax[0].legend(fontsize=8)
+fig.suptitle("Benchmark (added after H2): EEG -> report embedding, leave-one-participant-out, Holm p over epochs")
+fig.tight_layout(); fig.savefig(figs / "benchmark_h2.pdf"); fig.savefig(figs / "benchmark_h2.png", dpi=150)
+env.write_manifest(cfg, "07_benchmark", [tables / "benchmark_h2.csv"])'''),
+]
+
+NB08 = [
+    md("""# 08 · Sleep-EDF: does the exponent steepen at scored sleep onset?
+
+**Independent check of the H1 post hoc result; settings fixed in `config.yaml` (`sleepedf`) before this
+notebook first ran.** NB4 found that in sleep-onset (SO) awakenings the posterior exponent steepens, delta
+rises and alpha falls across the 45 s before waking, and read that as the descent into sleep. If that reading
+is right, the same pipeline should show the same change across the 45 s after scored sleep onset in a dataset
+where onset is known.
+
+- **Data:** Sleep-EDF Expanded, Sleep Cassette (Kemp et al. 2000; PhysioNet), first night of every subject,
+  channel Pz-Oz (posterior), 100 Hz, hypnogram scored in 30-s epochs (R&K).
+- **Onset:** first 30-s epoch scored stage 1 or 2 that starts ≥ 3 consecutive non-wake epochs. Known only to
+  ± 30 s.
+- **Windows:** three 15-s epochs from onset ([0, 45) s), and a **wake control**: three 15-s epochs at
+  [-300, -255) s, scored wake throughout. No change is expected in the control.
+- **Pipeline:** the NB2-NB3 code: 0.5-30 Hz filter, robust artifact rejection (one scale per recording),
+  Welch spectra, band power, specparam exponent 1-30 Hz.
+- **Tests:** per window, mixed model (time + artifact rate, random intercept and random time slope per subject)
+  and the model-free sign-flip test; plus a sign-flip test on onset slope minus control slope.
+- **Primary:** exponent rises across the onset window. Secondary: delta rises. Alpha falls by construction
+  (stage 1 is scored on alpha loss), so it is shown, not counted as evidence.
+
+Raw files go to Colab's temporary disk (`/content/sleep_physionet`), not Drive; only features and results are kept.
+Runtime: mostly the download (a few GB)."""),
+    code(BOOTSTRAP),
+    code('''import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from pathlib import Path
+from d2i import features, sleepedf, stats
+sc, fc = cfg["sleepedf"], cfg["features"]
+der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
+raw_dir = os.environ.get("D2I_SLEEPEDF") or ("/content/sleep_physionet" if Path("/content").is_dir() else None)
+subjects = range(83) if sc["subjects"] == "all" else sc["subjects"]
+files, missing = sleepedf.fetch(subjects, sc["recording"], raw_dir)
+print(len(files), "recordings;", len(missing), "subjects without one:", pd.DataFrame(missing).reason.value_counts().to_dict() if missing else {})'''),
+    md("## 1. Onset, windows, features"),
+    code('''rows, spectra, recs = [], [], []
+for s, psg, hyp in files:
+    r, S, f, rec = sleepedf.process(psg, hyp, cfg)
+    recs.append({"subject": s, **rec})
+    for x in r:
+        rows.append({"participant": f"sc{s:02d}", "sample_id": f"sc{s:02d}", **x})
+    if S is not None:
+        spectra.append(S); freqs = f
+recs = pd.DataFrame(recs + missing).sort_values("subject")
+assert not recs.reason.str.startswith("download failed").any(), "rerun: some downloads failed"
+recs.to_csv(tables / "sleepedf_recordings.csv", index=False)
+print(recs.reason.replace("", "included").value_counts().to_dict())
+feat = pd.DataFrame(rows)
+S = np.concatenate(spectra)
+good = feat.ok.values
+ap = features.fit_aperiodic(freqs, S[good], fc)
+for k, v in ap.items():
+    feat.loc[good, k] = v
+feat["time30"] = feat.center_s / 30
+feat.to_csv(der / "sleepedf_features.csv", index=False)
+print(f"epochs {len(feat)}, ok {good.mean():.1%}, median R² {np.median(ap['fit_r2']):.3f}")
+print(feat.groupby(["window", "epoch"])[["reject_rate", "logpow_delta", "logpow_alpha", "ap_exponent"]].mean().round(3))'''),
+    md("## 2. Tests"),
+    code('''srng = np.random.default_rng(cfg["seed"])
+measures = [sc["primary"], *sc["secondary"], *sc["circular"]]
+role = {sc["primary"]: "primary", **{m: "secondary" for m in sc["secondary"]}, **{m: "circular (not evidence)" for m in sc["circular"]}}
+out = []
+for w, g in feat.groupby("window"):
+    for y in measures:
+        try:
+            mm = stats.fit_trend(g, y, ["reject_rate"], random_slope=True, nested=False)
+        except np.linalg.LinAlgError:  # too few subjects for a random slope
+            mm = {"y": y, "estimate": np.nan, "p": np.nan, "converged": False}
+        out.append({"window": w, "role": role[y], "test": "mixed model, random slope per subject", **mm})
+        out.append({"window": w, "role": role[y], "test": "sign-flip over subjects",
+                    **stats.signflip_slopes(g, y, sc["n_signflip"], srng)})
+# onset slope minus control slope, per subject
+for y in measures:
+    sl = (feat.dropna(subset=[y]).groupby(["window", "participant"])
+          .apply(lambda g: np.polyfit(g.time30, g[y], 1)[0] if len(g) >= 2 else np.nan, include_groups=False)
+          .unstack(0).dropna())
+    d = (sl["onset"] - sl["wake"]).to_numpy()
+    null = np.abs((srng.choice([-1, 1], size=(sc["n_signflip"], len(d))) * d).mean(1))
+    out.append({"window": "onset - wake", "role": role[y], "test": "sign-flip over subjects", "y": y,
+                "estimate": d.mean(), "p": (np.sum(null >= abs(d.mean())) + 1) / (sc["n_signflip"] + 1),
+                "n_participants": len(d)})
+res = pd.DataFrame(out)
+res.to_csv(tables / "sleepedf_onset.csv", index=False)
+print(res[["window", "y", "role", "test", "estimate", "ci_low", "ci_high", "p", "n_participants"]]
+      .round(4).to_string(index=False))'''),
+    md("## 3. Figure"),
+    code('''fig, ax = plt.subplots(1, 3, figsize=(15, 4))
+for a, y in zip(ax, measures):
+    for w, c in [("onset", "#c0504d"), ("wake", "#888888")]:
+        d = feat[feat.window == w].dropna(subset=[y]).copy()
+        d["centered"] = d[y] - d.groupby("participant")[y].transform("mean")
+        m = d.groupby("center_s").centered.agg(["mean", "sem"])
+        lab = "after scored onset" if w == "onset" else "wake control (-300 s)"
+        a.errorbar(m.index, m["mean"], yerr=1.96 * m["sem"], marker="o", color=c, capsize=3,
+                   label=f"{lab} (n={d.participant.nunique()})")
+    a.axhline(0, color="grey", lw=.8, ls=":")
+    a.set(xlabel="epoch centre (s from window start)", ylabel="within-recording change",
+          title=f"Pz-Oz {y} ({role[y]})")
+ax[0].legend(fontsize=8)
+fig.suptitle("Sleep-EDF: change across 45 s after scored sleep onset vs a wake control")
+fig.tight_layout(); fig.savefig(figs / "sleepedf_onset.pdf"); fig.savefig(figs / "sleepedf_onset.png", dpi=150)
+env.write_manifest(cfg, "08_sleepedf", [tables / "sleepedf_onset.csv", tables / "sleepedf_recordings.csv",
+                                        der / "sleepedf_features.csv"], notes={"n_recordings": len(files)})'''),
+]
+
+
 RUN = [
     md("""# Run pipeline notebooks
 
@@ -624,7 +858,7 @@ One Drive mount and one install for the whole pipeline. Edit `NOTEBOOKS` and use
 On a fresh runtime the first cell installs extras and restarts once: Run all again after it reconnects.
 Executed copies with all outputs are saved to `results/notebooks/` on Drive."""),
     code(BOOTSTRAP),
-    code('''NOTEBOOKS = ["05_h2.ipynb", "06_controls.ipynb"]
+    code('''NOTEBOOKS = ["04_h1.ipynb", "06_controls.ipynb", "07_benchmark.ipynb", "08_sleepedf.ipynb"]
 from d2i import runner
 runner.run(NOTEBOOKS, timeout_s=7200)'''),
 ]
@@ -651,5 +885,7 @@ if __name__ == "__main__":
     write("04_h1.ipynb", NB04)
     write("05_h2.ipynb", NB05)
     write("06_controls.ipynb", NB06)
+    write("07_benchmark.ipynb", NB07)
+    write("08_sleepedf.ipynb", NB08)
     write("run_pipeline.ipynb", RUN)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))

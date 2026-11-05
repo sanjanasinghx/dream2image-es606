@@ -28,12 +28,16 @@ def embed(texts: dict, model_name: str) -> dict:
     return dict(zip(ids, vecs))
 
 
-def make_folds(X: np.ndarray, groups: np.ndarray) -> list[dict]:
+def make_folds(X: np.ndarray, groups: np.ndarray, fit_transform=None) -> list[dict]:
     """Leave-one-participant-out folds with the SVD of the standardised training features.
-    X is fixed across permutations (only the reports are shuffled), so this is computed once."""
+    X is fixed across permutations (only the reports are shuffled), so this is computed once.
+    fit_transform(train_mask) -> feature matrix for all rows, learned on the training rows only
+    (e.g. the Riemannian tangent space); it replaces X fold by fold."""
     folds = []
     for g in np.unique(groups):
         te, tr = groups == g, groups != g
+        if fit_transform is not None:
+            X = fit_transform(tr)
         mu, sd = X[tr].mean(0), X[tr].std(0) + 1e-12
         U, s, Vt = np.linalg.svd((X[tr] - mu) / sd, full_matrices=False)
         folds.append({"te": np.flatnonzero(te), "tr": tr, "U": U, "s": s,
@@ -96,3 +100,20 @@ def paired_epoch_test(a: np.ndarray, b: np.ndarray, groups: np.ndarray, n_perm: 
     return {"mean_diff": obs, "ci_low": lo, "ci_high": hi,
             "p_signflip": (np.sum(np.abs(null) >= abs(obs)) + 1) / (n_perm + 1),
             "tost_bound": bound, "p_tost": max(p_lower, p_upper), "n_participants": len(diff)}
+
+
+def tangent_space(covs: np.ndarray):
+    """Fold-wise Riemannian tangent-space features (Barachant et al. 2012): the reference point
+    (Riemannian mean) is estimated on the training rows only, then every covariance is projected."""
+    from pyriemann.tangentspace import TangentSpace
+
+    def fit_transform(tr: np.ndarray) -> np.ndarray:
+        return TangentSpace(metric="riemann").fit(covs[tr]).transform(covs)
+    return fit_transform
+
+
+def clean_covariance(x: np.ndarray, bad: np.ndarray, estimator: str = "oas") -> np.ndarray:
+    """Channel covariance of one epoch from its non-rejected samples. Shrinkage (OAS) keeps it
+    positive definite: the average reference and interpolation leave the raw covariance rank-deficient."""
+    from pyriemann.utils.covariance import covariances
+    return covariances(x[None, :, ~bad], estimator=estimator)[0]

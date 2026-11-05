@@ -86,6 +86,10 @@ h1:
   primary: [logpow_delta, ap_exponent]   # posterior ROI; H1 predicts both fall toward awakening
   covariates: [site, reject_rate]        # also refit without reject_rate: pre-waking movement may be part of the effect
   alpha: 0.05                   # Holm across the two primary tests; FDR (BH) for the exploratory channel map
+  # Added after review (Nov 2026), not pre-specified: the primary model has random intercepts only, which
+  # understates the uncertainty of the time effect when slopes vary between people (Barr et al. 2013).
+  # NB4 section 6 refits with a random slope per participant and adds a model-free sign-flip test.
+  n_signflip: 10000
 
 # NB5: H2. Fixed before looking at any decoding result.
 h2:
@@ -95,6 +99,32 @@ h2:
   alphas: [0.1, 1, 10, 100, 1000, 10000, 100000]
   n_perm: 1000
   tost_bound: 0.05              # equivalence bound on the E4 - E2 rank-accuracy difference
+
+# NB7: benchmark decoder for H2. Added after the H2 results; fixed before NB7 was first run.
+# Same awakenings, folds, targets, score and nulls as NB5; only the EEG representation changes.
+benchmark:
+  decoder: riemannian_tangent_space   # Barachant et al. 2012; reference point fitted on training participants
+  cov_estimator: oas                  # shrinkage: average reference + interpolation make raw covariances singular
+
+# NB8: Sleep-EDF Expanded, Sleep Cassette (Kemp et al. 2000; PhysioNet, Goldberger et al. 2000).
+# Independent check of the H1 post hoc result: does the same pipeline show a steeper exponent across
+# the 45 s after scored sleep onset? Fixed before NB8 was first run.
+sleepedf:
+  subjects: all                 # every Sleep Cassette subject (0-82; missing ones are skipped)
+  recording: 1                  # first night only: one recording per subject
+  channel: EEG Pz-Oz            # posterior, closest to the Dream2Image ROI; 100 Hz
+  stage_epoch_s: 30.0           # hypnogram resolution (R&K): onset is known only to +/- 30 s
+  # onset = first 30-s epoch scored stage 1 or 2 that starts >= 3 consecutive non-wake epochs
+  # (1, 2, 3, 4, R): the 45-s window then lies in sleep
+  onset_min_run: 3
+  windows:                      # start of three 15-s epochs, seconds from onset
+    onset: 0                    # [0, 45) s after onset
+    wake: -300                  # control: [-300, -255) s, must be scored wake throughout
+  segment_s: [-360, 60]         # span used for the robust artifact scale
+  primary: ap_exponent          # prediction: rises (steepens) across the onset window, not the wake window
+  secondary: [logpow_delta]     # prediction: rises
+  circular: [logpow_alpha]      # alpha loss is how stage 1 is scored: reported, not evidence
+  n_signflip: 10000
 
 paths:                          # relative to the data root (Drive on Colab, D2I_DATA locally)
   hf: hf
