@@ -1,0 +1,15 @@
+{
+  "step": "07_benchmark",
+  "created": "2026-11-05T08:01:23",
+  "runtime": "colab",
+  "python": "3.13.18",
+  "seed": 20251006,
+  "config_sha": "8ce0ac845b962ff9",
+  "outputs": [
+    {
+      "path": "results/tables/benchmark_h2.csv",
+      "sha256_16": "9ed94d4aef414a9d"
+    }
+  ],
+  "notes": {}
+}

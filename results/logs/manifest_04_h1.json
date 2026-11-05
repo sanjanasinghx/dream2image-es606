@@ -1,26 +1,34 @@
 {
   "step": "04_h1",
-  "created": "2026-11-02T13:25:18",
-  "runtime": "local",
-  "python": "3.12.7",
+  "created": "2026-11-05T07:40:56",
+  "runtime": "colab",
+  "python": "3.13.18",
   "seed": 20251006,
-  "config_sha": "2f066a9af1da6107",
+  "config_sha": "8ce0ac845b962ff9",
   "outputs": [
     {
       "path": "results/tables/h1_primary.csv",
-      "sha256_16": "d2efb2670271c0a2"
+      "sha256_16": "9e505e91a658f55a"
     },
     {
       "path": "results/tables/rq3_richness.csv",
-      "sha256_16": "0b262eef14f09b5b"
+      "sha256_16": "578869eedf4c93d4"
     },
     {
       "path": "results/tables/h1_exploratory_roi.csv",
-      "sha256_16": "9b992a677a0789a5"
+      "sha256_16": "eb443377a5bd06dc"
     },
     {
       "path": "results/tables/h1_exploratory_channels.csv",
-      "sha256_16": "4c48be8056a9b48f"
+      "sha256_16": "c1078aa076e3113c"
+    },
+    {
+      "path": "results/tables/h1_posthoc_awakening_type.csv",
+      "sha256_16": "707b5b42cb4ae908"
+    },
+    {
+      "path": "results/tables/h1_sensitivity.csv",
+      "sha256_16": "faa10848168db35c"
     }
   ],
   "notes": {}

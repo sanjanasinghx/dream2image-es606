@@ -1,14 +1,14 @@
 {
   "step": "06_controls",
-  "created": "2026-11-02T13:28:58",
-  "runtime": "local",
-  "python": "3.12.7",
+  "created": "2026-11-05T07:43:51",
+  "runtime": "colab",
+  "python": "3.13.18",
   "seed": 20251006,
-  "config_sha": "2f066a9af1da6107",
+  "config_sha": "8ce0ac845b962ff9",
   "outputs": [
     {
       "path": "results/tables/controls.csv",
-      "sha256_16": "c794363610bc9bdd"
+      "sha256_16": "8a3b7a933a85e88e"
     }
   ],
   "notes": {}

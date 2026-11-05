@@ -737,112 +737,6 @@ fig.tight_layout(); fig.savefig(figs / "benchmark_h2.pdf"); fig.savefig(figs / "
 env.write_manifest(cfg, "07_benchmark", [tables / "benchmark_h2.csv"])'''),
 ]
 
-NB08 = [
-    md("""# 08 · Sleep-EDF: does the exponent steepen at scored sleep onset?
-
-**Independent check of the H1 post hoc result; settings fixed in `config.yaml` (`sleepedf`) before this
-notebook first ran.** NB4 found that in sleep-onset (SO) awakenings the posterior exponent steepens, delta
-rises and alpha falls across the 45 s before waking, and read that as the descent into sleep. If that reading
-is right, the same pipeline should show the same change across the 45 s after scored sleep onset in a dataset
-where onset is known.
-
-- **Data:** Sleep-EDF Expanded, Sleep Cassette (Kemp et al. 2000; PhysioNet), first night of every subject,
-  channel Pz-Oz (posterior), 100 Hz, hypnogram scored in 30-s epochs (R&K).
-- **Onset:** first 30-s epoch scored stage 1 or 2 that starts ≥ 3 consecutive non-wake epochs. Known only to
-  ± 30 s.
-- **Windows:** three 15-s epochs from onset ([0, 45) s), and a **wake control**: three 15-s epochs at
-  [-300, -255) s, scored wake throughout. No change is expected in the control.
-- **Pipeline:** the NB2-NB3 code: 0.5-30 Hz filter, robust artifact rejection (one scale per recording),
-  Welch spectra, band power, specparam exponent 1-30 Hz.
-- **Tests:** per window, mixed model (time + artifact rate, random intercept and random time slope per subject)
-  and the model-free sign-flip test; plus a sign-flip test on onset slope minus control slope.
-- **Primary:** exponent rises across the onset window. Secondary: delta rises. Alpha falls by construction
-  (stage 1 is scored on alpha loss), so it is shown, not counted as evidence.
-
-Raw files go to Colab's temporary disk (`/content/sleep_physionet`), not Drive; only features and results are kept.
-Runtime: mostly the download (a few GB)."""),
-    code(BOOTSTRAP),
-    code('''import numpy as np, pandas as pd, matplotlib.pyplot as plt
-from pathlib import Path
-from d2i import features, sleepedf, stats
-sc, fc = cfg["sleepedf"], cfg["features"]
-der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
-tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
-raw_dir = os.environ.get("D2I_SLEEPEDF") or ("/content/sleep_physionet" if Path("/content").is_dir() else None)
-subjects = range(83) if sc["subjects"] == "all" else sc["subjects"]
-files, missing = sleepedf.fetch(subjects, sc["recording"], raw_dir, sc["base_url"])
-print(len(files), "recordings;", len(missing), "subjects without one:", pd.DataFrame(missing).reason.value_counts().to_dict() if missing else {})'''),
-    md("## 1. Onset, windows, features"),
-    code('''rows, spectra, recs = [], [], []
-for s, psg, hyp in files:
-    r, S, f, rec = sleepedf.process(psg, hyp, cfg)
-    recs.append({"subject": s, **rec})
-    for x in r:
-        rows.append({"participant": f"sc{s:02d}", "sample_id": f"sc{s:02d}", **x})
-    if S is not None:
-        spectra.append(S); freqs = f
-recs = pd.DataFrame(recs + missing).sort_values("subject")
-assert not recs.reason.str.startswith("download failed").any(), "rerun: some downloads failed"
-recs.to_csv(tables / "sleepedf_recordings.csv", index=False)
-print(recs.reason.replace("", "included").value_counts().to_dict())
-feat = pd.DataFrame(rows)
-S = np.concatenate(spectra)
-good = feat.ok.values
-ap = features.fit_aperiodic(freqs, S[good], fc)
-for k, v in ap.items():
-    feat.loc[good, k] = v
-feat["time30"] = feat.center_s / 30
-feat.to_csv(der / "sleepedf_features.csv", index=False)
-print(f"epochs {len(feat)}, ok {good.mean():.1%}, median R² {np.median(ap['fit_r2']):.3f}")
-print(feat.groupby(["window", "epoch"])[["reject_rate", "logpow_delta", "logpow_alpha", "ap_exponent"]].mean().round(3))'''),
-    md("## 2. Tests"),
-    code('''srng = np.random.default_rng(cfg["seed"])
-measures = [sc["primary"], *sc["secondary"], *sc["circular"]]
-role = {sc["primary"]: "primary", **{m: "secondary" for m in sc["secondary"]}, **{m: "circular (not evidence)" for m in sc["circular"]}}
-out = []
-for w, g in feat.groupby("window"):
-    for y in measures:
-        try:
-            mm = stats.fit_trend(g, y, ["reject_rate"], random_slope=True, nested=False)
-        except np.linalg.LinAlgError:  # too few subjects for a random slope
-            mm = {"y": y, "estimate": np.nan, "p": np.nan, "converged": False}
-        out.append({"window": w, "role": role[y], "test": "mixed model, random slope per subject", **mm})
-        out.append({"window": w, "role": role[y], "test": "sign-flip over subjects",
-                    **stats.signflip_slopes(g, y, sc["n_signflip"], srng)})
-# onset slope minus control slope, per subject
-for y in measures:
-    sl = (feat.dropna(subset=[y]).groupby(["window", "participant"])
-          .apply(lambda g: np.polyfit(g.time30, g[y], 1)[0] if len(g) >= 2 else np.nan, include_groups=False)
-          .unstack(0).dropna())
-    d = (sl["onset"] - sl["wake"]).to_numpy()
-    null = np.abs((srng.choice([-1, 1], size=(sc["n_signflip"], len(d))) * d).mean(1))
-    out.append({"window": "onset - wake", "role": role[y], "test": "sign-flip over subjects", "y": y,
-                "estimate": d.mean(), "p": (np.sum(null >= abs(d.mean())) + 1) / (sc["n_signflip"] + 1),
-                "n_participants": len(d)})
-res = pd.DataFrame(out)
-res.to_csv(tables / "sleepedf_onset.csv", index=False)
-print(res[["window", "y", "role", "test", "estimate", "ci_low", "ci_high", "p", "n_participants"]]
-      .round(4).to_string(index=False))'''),
-    md("## 3. Figure"),
-    code('''fig, ax = plt.subplots(1, 3, figsize=(15, 4))
-for a, y in zip(ax, measures):
-    for w, c in [("onset", "#c0504d"), ("wake", "#888888")]:
-        d = feat[feat.window == w].dropna(subset=[y]).copy()
-        d["centered"] = d[y] - d.groupby("participant")[y].transform("mean")
-        m = d.groupby("center_s").centered.agg(["mean", "sem"])
-        lab = "after scored onset" if w == "onset" else "wake control (-300 s)"
-        a.errorbar(m.index, m["mean"], yerr=1.96 * m["sem"], marker="o", color=c, capsize=3,
-                   label=f"{lab} (n={d.participant.nunique()})")
-    a.axhline(0, color="grey", lw=.8, ls=":")
-    a.set(xlabel="epoch centre (s from window start)", ylabel="within-recording change",
-          title=f"Pz-Oz {y} ({role[y]})")
-ax[0].legend(fontsize=8)
-fig.suptitle("Sleep-EDF: change across 45 s after scored sleep onset vs a wake control")
-fig.tight_layout(); fig.savefig(figs / "sleepedf_onset.pdf"); fig.savefig(figs / "sleepedf_onset.png", dpi=150)
-env.write_manifest(cfg, "08_sleepedf", [tables / "sleepedf_onset.csv", tables / "sleepedf_recordings.csv",
-                                        der / "sleepedf_features.csv"], notes={"n_recordings": len(files)})'''),
-]
-
 
 RUN = [
     md("""# Run pipeline notebooks
@@ -851,7 +745,7 @@ One Drive mount and one install for the whole pipeline. Edit `NOTEBOOKS` and use
 On a fresh runtime the first cell installs extras and restarts once: Run all again after it reconnects.
 Executed copies with all outputs are saved to `results/notebooks/` on Drive."""),
     code(BOOTSTRAP),
-    code('''NOTEBOOKS = ["04_h1.ipynb", "06_controls.ipynb", "07_benchmark.ipynb", "08_sleepedf.ipynb"]
+    code('''NOTEBOOKS = ["04_h1.ipynb", "06_controls.ipynb", "07_benchmark.ipynb"]
 from d2i import runner
 runner.run(NOTEBOOKS, timeout_s=7200)'''),
 ]
@@ -879,6 +773,5 @@ if __name__ == "__main__":
     write("05_h2.ipynb", NB05)
     write("06_controls.ipynb", NB06)
     write("07_benchmark.ipynb", NB07)
-    write("08_sleepedf.ipynb", NB08)
     write("run_pipeline.ipynb", RUN)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))
