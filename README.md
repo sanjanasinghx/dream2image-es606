@@ -20,6 +20,7 @@ E4 [-15, 0) s, all cut from `eeg_120s`.
 | H1, by awakening type (post hoc) | The change is confined to sleep-onset awakenings (n = 68; exponent p < .0001, alpha and beta fall, delta rises); other awakenings flat | `h1_posthoc_awakening_type.csv` |
 | H1 sensitivity (added after review) | With a random time slope per participant the pooled exponent effect is not significant (p = .075; sign-flip over participants p = .26). It mixes sleep-onset steepening (p <= .002 in every check) with flattening in the `case` site (mixed models p = .023, but sign-flip p = .19) and no change in `subject` non-SO awakenings | `h1_sensitivity.csv` |
 | H1 controls | Holds without flagged samples and within one site. Artifact rate: flat pooled (p = .82) and in the `subject` site (p = .33), a non-significant rise toward awakening in the `case` site (p = .079; E4 26% rejected vs about 15% earlier) | `controls.csv` |
+| H1 benchmark (added after H1) | The exponent re-estimated with IRASA (1.5-20 Hz) and with specparam refitted on 1.5-20 Hz agrees with NB4 (r = .87-.93). Sleep-onset steepening holds with every estimator and test (IRASA: random slope p = .0002, sign-flip p = .002); `subject` non-SO stays flat; the pooled effect stays fragile (sign-flip p = .18-.22). Same 262 epochs (107 awakenings) for all estimators | `h1_benchmark.csv`, `h1_benchmark_agreement.csv`, `benchmark_h1` |
 | Report richness (exploratory) | Does not change the slope (p = .52 and .53) | `rq3_richness.csv` |
 | H2 | Not supported. Decoding above a free-shuffle null in every epoch (Holm p = .003) with no E4 advantage (E4 - E2 = 0.004, equivalence p < .001) | `h2_decoding_by_epoch.csv`, `h2_e4_vs_e2.csv` |
 | H2 confound control (post hoc) | Site and awakening-type labels alone decode better (0.65) than EEG (0.59); against a within-category null, EEG is at chance (p = .65-.81) | `h2_confound_control.csv`, `h2_decoding` |
@@ -49,11 +50,12 @@ outputs in `results/notebooks/`, run manifests in `results/logs/`.
 | `05_h2` | Report embeddings (SBERT), leave-one-participant-out ridge decoding, permutation nulls, confound control | Colab (embeddings), then Colab or local |
 | `06_controls` | Robustness controls; zips `results/` | Colab or local |
 | `07_benchmark` | Riemannian tangent-space decoder against the same two nulls as NB5 | Colab or local |
+| `08_benchmark_h1` | Aperiodic exponent by IRASA and by specparam on 1.5-20 Hz, with the NB4 time-effect tests | Colab or local |
 
 On Colab: for NB0-NB1 only, add to Colab Secrets: `HF_TOKEN` (Hugging Face read token). Open `notebooks/run_pipeline.ipynb`,
 set `NOTEBOOKS`, Run all. Data and outputs go to `MyDrive/ES606_Dream2Image/`.
 
-Locally: NB4-NB7 skip the raw EEG (NB7 reads the cleaned epochs in `derived/clean/`) but need, from the Drive folder: `derived/`, the metadata files
+Locally: NB4-NB8 skip the raw EEG (NB7 and NB8 read the cleaned epochs in `derived/clean/`) but need, from the Drive folder: `derived/`, the metadata files
 `raw/s*.json` (report word counts) and the `results/tables/` written by NB1-NB2.
 
 ```bash
@@ -77,6 +79,8 @@ results/               tables, figures, executed notebooks, logs
 - Bellec, Y. (2025). Dream2Image: an open multimodal EEG dataset for decoding and visualizing dreams with AI. arXiv:2510.06252.
 - Siclari, F. et al. (2017). The neural correlates of dreaming. *Nature Neuroscience* 20, 872-878.
 - Donoghue, T. et al. (2020). Parameterizing neural power spectra into periodic and aperiodic components. *Nature Neuroscience* 23, 1655-1665.
+- Wen, H. & Liu, Z. (2016). Separating fractal and oscillatory components in the power spectrum of neurophysiological signal. *Brain Topography* 29, 13-26.
+- Lendner, J. D. et al. (2020). An electrophysiological marker of arousal level in humans. *eLife* 9, e55092.
 - Wong, W. et al. (2025). A dream EEG and mentation database. *Nature Communications* 16, 7495.
 
 Methods used in the checks:

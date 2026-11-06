@@ -11,3 +11,5 @@ nbconvert
 ipykernel
 # NB7 (Riemannian benchmark)
 pyriemann>=0.6
+# NB8 (H1 benchmark: specparam refit on 1.5-20 Hz)
+specparam>=2.0.0rc1

@@ -738,6 +738,120 @@ env.write_manifest(cfg, "07_benchmark", [tables / "benchmark_h2.csv"])'''),
 ]
 
 
+NB08 = [
+    md("""# 08 · Benchmark for H1: does the exponent result depend on the estimator?
+
+**Added after the H1 results; settings fixed in `config.yaml` (`h1_benchmark`) before this notebook first ran.**
+
+NB4's exponent comes from specparam fitted 1-30 Hz (Donoghue et al. 2020). This notebook re-estimates it with
+an independent, standard method and repeats the NB4 time-effect tests unchanged:
+
+- **IRASA** (Wen & Liu 2016): the fractal spectrum by irregular resampling (h = 1.1-1.5), then a log-log line.
+  It removes oscillatory peaks without modelling them, so it does not share specparam's peak-fitting choices.
+- **Range:** IRASA reads power at f·h and f/h, so on 0.5-30 Hz data it is valid on 1.5-20 Hz. specparam is
+  also **refitted on 1.5-20 Hz**, which separates a change of method from a change of range.
+- **Tests:** the NB4 section 6 checks (random intercepts as pre-specified, + random slope per participant,
+  sign-flip over participants) for all awakenings, sleep onset (SO), `subject` non-SO and the `case` site,
+  on the epochs where all three estimates exist.
+
+Reading: the SO steepening holds with IRASA → it is a property of the signal, not of one estimator.
+The steeper exponent with lighter-to-deeper sleep matches the direction reported by Lendner et al. (2020);
+their values (30-45 Hz) are not comparable in size here, because the data are low-passed at 30 Hz.
+Runtime: CPU, a few minutes."""),
+    code(BOOTSTRAP),
+    code('''import numpy as np, pandas as pd, matplotlib.pyplot as plt
+from d2i import features, stats
+fc, hc, bc, fs = cfg["features"], cfg["h1"], cfg["h1_benchmark"], cfg["dataset"]["sfreq"]
+der, tables, figs = env.path(cfg, "derived"), env.path(cfg, "results") / "tables", env.path(cfg, "results") / "figures"
+tables.mkdir(exist_ok=True); figs.mkdir(exist_ok=True)
+long = pd.read_csv(der / "features_long.csv")
+sp = np.load(der / "spectra.npz", allow_pickle=True)
+assert (sp["sample_id"] == long.sample_id.values).all() and (sp["channel"] == long.channel.values).all()
+long = long[long.epoch.isin(hc["epochs"])]
+hset = np.round(np.arange(bc["hset"][0], bc["hset"][1] + 1e-9, bc["hset"][2]), 4)
+print("rows", len(long), "| usable", int(long.ok.sum()), "| h:", hset.tolist(), "| fit range", bc["fit_range"])'''),
+    md("## 1. IRASA exponent per sample × epoch × channel"),
+    code('''out = []
+for (s, e), g in long[long.ok].groupby(["sample_id", "epoch"]):
+    z = np.load(der / "clean" / f"{s}.npz")
+    chans = list(z["channels"])
+    f, P, n = features.irasa(z[e], z[f"{e}_bad"], fs, fc["welch_win_s"], fc["welch_overlap_s"], hset, bc["mask_pad_s"])
+    if P is None or n < fc["min_clean_segments"]:
+        continue
+    fit = features.fit_powerlaw(f, P, bc["fit_range"])
+    out += [{"sample_id": s, "epoch": e, "channel": c, "irasa_n_seg": n,
+             "irasa_exponent": fit["ap_exponent"][i] if fit["fit_r2"][i] >= fc["min_r2"] else np.nan,
+             "irasa_r2": fit["fit_r2"][i]} for i, c in enumerate(chans)]
+ir = pd.DataFrame(out)
+print(f"IRASA: {ir.groupby(['sample_id', 'epoch']).ngroups} epochs, median R² {ir.irasa_r2.median():.3f}, "
+      f"R² < {fc['min_r2']}: {(ir.irasa_r2 < fc['min_r2']).mean():.1%}")'''),
+    md("## 2. specparam refitted on the same range"),
+    code('''good = long.ok.values
+ap = features.fit_aperiodic(sp["f"], sp["psd"][long.index[good]], dict(fc, specparam_range=bc["fit_range"]))
+long.loc[good, "sp_range_exponent"] = ap["ap_exponent"]
+print(f"specparam {bc['fit_range']} Hz: median R² {np.median(ap['fit_r2']):.3f}")
+d = long.merge(ir, on=["sample_id", "epoch", "channel"], how="left")
+est = {"specparam 1-30 Hz (NB4)": "ap_exponent", "specparam 1.5-20 Hz": "sp_range_exponent", "IRASA 1.5-20 Hz": "irasa_exponent"}
+keys = ["sample_id", "participant", "site", "tag_class", "epoch", "center_s", "reject_rate"]
+roi = (d[d.channel.isin(fc["posterior_roi"]) & d.ok].groupby(keys, dropna=False)[list(est.values())]
+       .mean().reset_index().dropna(subset=list(est.values())))  # same epochs for every estimator
+roi["time30"] = roi.center_s / 30.0
+print("posterior ROI epochs with all three estimates:", len(roi), "| awakenings", roi.sample_id.nunique(),
+      "| participants", roi.participant.nunique())'''),
+    md("## 3. Agreement between estimators"),
+    code('''def within_slope(col):
+    g = roi.groupby("sample_id")
+    return g.apply(lambda x: np.polyfit(x.time30, x[col], 1)[0] if len(x) >= 2 else np.nan, include_groups=False)
+agree = []
+names = list(est)
+for i in range(3):
+    for j in range(i + 1, 3):
+        a, b = est[names[i]], est[names[j]]
+        agree.append({"a": names[i], "b": names[j], "r_values": roi[a].corr(roi[b]),
+                      "r_within_awakening_slopes": within_slope(a).corr(within_slope(b)),
+                      "mean_a": roi[a].mean(), "mean_b": roi[b].mean(), "n_epochs": len(roi)})
+agree = pd.DataFrame(agree)
+agree.to_csv(tables / "h1_benchmark_agreement.csv", index=False)
+print(agree.round(3).to_string(index=False))'''),
+    md("## 4. The NB4 time-effect tests, per estimator"),
+    code('''srng = np.random.default_rng(cfg["seed"])
+groups = {"all": (roi, hc["covariates"]),
+          "sleep onset (SO)": (roi[roi.tag_class == "SO"], ["reject_rate"]),
+          "subject site, not SO": (roi[(roi.site == "subject") & (roi.tag_class != "SO")], ["reject_rate"]),
+          "case site (stage untagged)": (roi[roi.site == "case"], ["reject_rate"])}
+rows = []
+for name, (g, cov) in groups.items():
+    for lab, y in est.items():
+        base = {"group": name, "estimator": lab}
+        rows.append({**base, "model": "random intercepts (pre-specified)", **stats.fit_trend(g, y, cov)})
+        rows.append({**base, "model": "+ random slope per participant", **stats.fit_trend(g, y, cov, random_slope=True)})
+        rows.append({**base, "model": "sign-flip over participants", **stats.signflip_slopes(g, y, hc["n_signflip"], srng)})
+bench = pd.DataFrame(rows)
+bench.to_csv(tables / "h1_benchmark.csv", index=False)
+print(bench[["group", "estimator", "model", "estimate", "p", "n_awakenings", "n_participants"]]
+      .round(4).to_string(index=False))'''),
+    md("## 5. Figure"),
+    code('''cols = dict(zip(est, ["#4a6fa5", "#9ecae1", "#2ca25f"]))
+fig, ax = plt.subplots(1, 3, figsize=(16, 4.2))
+for a, (name, mask) in zip(ax[:2], [("sleep onset (SO)", roi.tag_class == "SO"), ("all other awakenings", roi.tag_class != "SO")]):
+    for k, (lab, y) in enumerate(est.items()):
+        g = roi[mask].copy()
+        g["c"] = g[y] - g.groupby("sample_id")[y].transform("mean")
+        m = g.groupby("center_s").c.agg(["mean", "sem"])
+        a.errorbar(m.index + (k - 1) * .8, m["mean"], yerr=1.96 * m["sem"], marker="o", capsize=3, color=cols[lab], label=lab)
+    a.axhline(0, color="grey", lw=.8, ls=":")
+    a.set(xlabel="epoch centre (s before awakening)", ylabel="within-awakening change in exponent",
+          title=f"{name} (n={roi[mask].sample_id.nunique()})")
+ax[0].legend(fontsize=8)
+ax[2].scatter(roi[est["specparam 1-30 Hz (NB4)"]], roi[est["IRASA 1.5-20 Hz"]], s=8, alpha=.5, color="#2ca25f")
+ax[2].set(xlabel="specparam exponent, 1-30 Hz (NB4)", ylabel="IRASA exponent, 1.5-20 Hz",
+          title=f"Posterior ROI, one point per epoch (r = {roi[est['specparam 1-30 Hz (NB4)']].corr(roi[est['IRASA 1.5-20 Hz']]):.2f})")
+fig.suptitle("Benchmark for H1 (added after H1): aperiodic exponent by three estimators, mean ± 95% CI")
+fig.tight_layout(); fig.savefig(figs / "benchmark_h1.pdf"); fig.savefig(figs / "benchmark_h1.png", dpi=150)
+env.write_manifest(cfg, "08_benchmark_h1", [tables / "h1_benchmark.csv", tables / "h1_benchmark_agreement.csv"])'''),
+]
+
+
 RUN = [
     md("""# Run pipeline notebooks
 
@@ -745,7 +859,7 @@ One Drive mount and one install for the whole pipeline. Edit `NOTEBOOKS` and use
 On a fresh runtime the first cell installs extras and restarts once: Run all again after it reconnects.
 Executed copies with all outputs are saved to `results/notebooks/` on Drive."""),
     code(BOOTSTRAP),
-    code('''NOTEBOOKS = ["04_h1.ipynb", "06_controls.ipynb", "07_benchmark.ipynb"]
+    code('''NOTEBOOKS = ["08_benchmark_h1.ipynb"]
 from d2i import runner
 runner.run(NOTEBOOKS, timeout_s=7200)'''),
 ]
@@ -773,5 +887,6 @@ if __name__ == "__main__":
     write("05_h2.ipynb", NB05)
     write("06_controls.ipynb", NB06)
     write("07_benchmark.ipynb", NB07)
+    write("08_benchmark_h1.ipynb", NB08)
     write("run_pipeline.ipynb", RUN)
     print("wrote", sorted(p.name for p in NB_DIR.glob("*.ipynb")))

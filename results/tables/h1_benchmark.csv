@@ -1,0 +1,37 @@
+group,estimator,model,y,term,estimate,ci_low,ci_high,p,std_estimate,n_obs,n_awakenings,n_participants,covariates,converged
+all,specparam 1-30 Hz (NB4),random intercepts (pre-specified),ap_exponent,time30,0.04647022103720369,0.012526377220613394,0.08041406485379399,0.0072909560964718656,0.15611626716067087,262.0,107,36,site+reject_rate,True
+all,specparam 1-30 Hz (NB4),+ random slope per participant,ap_exponent,time30,0.03959630710211887,-0.0020807701019587427,0.08127338430619649,0.06258747310784703,0.13302341844213303,262.0,107,36,site+reject_rate,True
+all,specparam 1-30 Hz (NB4),sign-flip over participants,ap_exponent,,0.06381203382585819,,,0.0362963703629637,,,94,33,,
+all,specparam 1.5-20 Hz,random intercepts (pre-specified),sp_range_exponent,time30,0.06376933251747308,0.017086080135393193,0.11045258489955295,0.007421566372931543,0.1903440311952072,262.0,107,36,site+reject_rate,True
+all,specparam 1.5-20 Hz,+ random slope per participant,sp_range_exponent,time30,0.04406666254491537,-0.017513176701112146,0.10564650179094288,0.16074977217785624,0.13153385583610647,262.0,107,36,site+reject_rate,True
+all,specparam 1.5-20 Hz,sign-flip over participants,sp_range_exponent,,0.0498817587358638,,,0.21797820217978203,,,94,33,,
+all,IRASA 1.5-20 Hz,random intercepts (pre-specified),irasa_exponent,time30,0.08994450900024835,0.044313665761018556,0.13557535223947814,0.00011184177797493097,0.26666216229680323,262.0,107,36,site+reject_rate,True
+all,IRASA 1.5-20 Hz,+ random slope per participant,irasa_exponent,time30,0.0687842480141171,0.006176640760372429,0.1313918552678618,0.03129299114490077,0.20392747162979583,262.0,107,36,site+reject_rate,True
+all,IRASA 1.5-20 Hz,sign-flip over participants,irasa_exponent,,0.05572890930159507,,,0.1807819218078192,,,94,33,,
+sleep onset (SO),specparam 1-30 Hz (NB4),random intercepts (pre-specified),ap_exponent,time30,0.08021636861156275,0.03536265804250184,0.12507007918062368,0.0004562656450238465,0.3469392285814609,147.0,59,16,reject_rate,True
+sleep onset (SO),specparam 1-30 Hz (NB4),+ random slope per participant,ap_exponent,time30,0.0711677889889943,0.010618846363732878,0.13171673161425573,0.02123976431928139,0.3078037343132834,147.0,59,16,reject_rate,True
+sleep onset (SO),specparam 1-30 Hz (NB4),sign-flip over participants,ap_exponent,,0.11535557722254726,,,0.009499050094990502,,,53,16,,
+sleep onset (SO),specparam 1.5-20 Hz,random intercepts (pre-specified),sp_range_exponent,time30,0.1083704044509559,0.04498935120608115,0.17175145769583067,0.0008046444142916679,0.37554643251672576,147.0,59,16,reject_rate,True
+sleep onset (SO),specparam 1.5-20 Hz,+ random slope per participant,sp_range_exponent,time30,0.09510135886525915,0.013522344314142051,0.17668037341637627,0.022322036788174647,0.32956392688839814,147.0,59,16,reject_rate,True
+sleep onset (SO),specparam 1.5-20 Hz,sign-flip over participants,sp_range_exponent,,0.12442535598946629,,,0.019098090190980903,,,53,16,,
+sleep onset (SO),IRASA 1.5-20 Hz,random intercepts (pre-specified),irasa_exponent,time30,0.14862930742867528,0.08715561314101519,0.21010300171633536,2.1504715492294943e-06,0.46737389899246073,147.0,59,16,reject_rate,True
+sleep onset (SO),IRASA 1.5-20 Hz,+ random slope per participant,irasa_exponent,time30,0.14340600134782613,0.06821660498671356,0.2185953977089387,0.0001853660460257587,0.4509488952642492,147.0,59,16,reject_rate,True
+sleep onset (SO),IRASA 1.5-20 Hz,sign-flip over participants,irasa_exponent,,0.19334833824464687,,,0.0016998300169983002,,,53,16,,
+"subject site, not SO",specparam 1-30 Hz (NB4),random intercepts (pre-specified),ap_exponent,time30,0.015917401222294684,-0.048318898188031534,0.0801537006326209,0.6272023759949402,0.04445934767471366,71.0,27,18,reject_rate,True
+"subject site, not SO",specparam 1-30 Hz (NB4),+ random slope per participant,ap_exponent,time30,0.020318575114456113,-0.055047652563333174,0.09568480279224541,0.5972202575602397,0.05675239209294496,71.0,27,18,reject_rate,True
+"subject site, not SO",specparam 1-30 Hz (NB4),sign-flip over participants,ap_exponent,,0.02112254804655852,,,0.6818318168183182,,,25,16,,
+"subject site, not SO",specparam 1.5-20 Hz,random intercepts (pre-specified),sp_range_exponent,time30,0.035556212309256686,-0.041062329189460255,0.11217475380797362,0.36305642684330364,0.08542797914602339,71.0,27,18,reject_rate,True
+"subject site, not SO",specparam 1.5-20 Hz,+ random slope per participant,sp_range_exponent,time30,0.02271765155259264,-0.06934650625869332,0.1147818093638786,0.6286423873374909,0.054581827957424556,71.0,27,18,reject_rate,True
+"subject site, not SO",specparam 1.5-20 Hz,sign-flip over participants,sp_range_exponent,,0.010429166872772365,,,0.8281171882811719,,,25,16,,
+"subject site, not SO",IRASA 1.5-20 Hz,random intercepts (pre-specified),irasa_exponent,time30,0.02806985349367447,-0.0518594722076821,0.10799917919503103,0.4912595728837734,0.07460103589670707,71.0,27,18,reject_rate,True
+"subject site, not SO",IRASA 1.5-20 Hz,+ random slope per participant,irasa_exponent,time30,0.0028286576425665512,-0.10359280171070576,0.10925011699583886,0.9584526886632783,0.007517701878285739,71.0,27,18,reject_rate,True
+"subject site, not SO",IRASA 1.5-20 Hz,sign-flip over participants,irasa_exponent,,-0.026805104823624797,,,0.6336366363363664,,,25,16,,
+case site (stage untagged),specparam 1-30 Hz (NB4),random intercepts (pre-specified),ap_exponent,time30,-0.038522593397117416,-0.10223632792998932,0.02519114113575449,0.23600428989120759,-0.22285772547649532,44.0,21,13,reject_rate,True
+case site (stage untagged),specparam 1-30 Hz (NB4),+ random slope per participant,ap_exponent,time30,-0.03842804399898842,-0.10312379320161374,0.026267705203636908,0.24435054167996395,-0.22231074610792104,44.0,21,13,reject_rate,True
+case site (stage untagged),specparam 1-30 Hz (NB4),sign-flip over participants,ap_exponent,,0.010851372965125212,,,0.8029197080291971,,,16,11,,
+case site (stage untagged),specparam 1.5-20 Hz,random intercepts (pre-specified),sp_range_exponent,time30,-0.072539419541022,-0.18696220792342835,0.041883368841384355,0.21403817061012964,-0.3640273539333312,44.0,21,13,reject_rate,True
+case site (stage untagged),specparam 1.5-20 Hz,+ random slope per participant,sp_range_exponent,time30,-0.0741014590724459,-0.1366430563876685,-0.011559861757223316,0.020220367318003935,-0.371866196881915,44.0,21,13,reject_rate,True
+case site (stage untagged),specparam 1.5-20 Hz,sign-flip over participants,sp_range_exponent,,0.0296094329743835,,,0.7416258374162584,,,16,11,,
+case site (stage untagged),IRASA 1.5-20 Hz,random intercepts (pre-specified),irasa_exponent,time30,-0.04008784594242586,-0.12685411409476835,0.046678422209916616,0.36517689014986465,-0.1617478680511925,44.0,21,13,reject_rate,True
+case site (stage untagged),IRASA 1.5-20 Hz,+ random slope per participant,irasa_exponent,time30,-0.03889457056156326,-0.12855034663579804,0.05076120551267152,0.3951728789384882,-0.15693319806045014,44.0,21,13,reject_rate,True
+case site (stage untagged),IRASA 1.5-20 Hz,sign-flip over participants,irasa_exponent,,-0.020737357432887033,,,0.7946205379462054,,,16,11,,

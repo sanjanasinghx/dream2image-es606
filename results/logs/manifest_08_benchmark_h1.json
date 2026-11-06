@@ -1,0 +1,19 @@
+{
+  "step": "08_benchmark_h1",
+  "created": "2026-11-06T15:10:41",
+  "runtime": "local",
+  "python": "3.12.7",
+  "seed": 20251006,
+  "config_sha": "e7ca6620aa5eab5e",
+  "outputs": [
+    {
+      "path": "results/tables/h1_benchmark.csv",
+      "sha256_16": "0c989fdb9d9cc533"
+    },
+    {
+      "path": "results/tables/h1_benchmark_agreement.csv",
+      "sha256_16": "f88c18359519e06c"
+    }
+  ],
+  "notes": {}
+}
