@@ -192,7 +192,7 @@ step0 = json.loads((env.path(cfg, "derived") / "step0.json").read_text())
 channels = [c for c in step0["primary_channels"] if c not in cfg["preprocess"]["drop_channels"]]
 out_dir = env.path(cfg, "derived") / "clean"; out_dir.mkdir(exist_ok=True)
 tables = env.path(cfg, "results") / "tables"
-figs = env.path(cfg, "results") / "figures"
+figs = env.path(cfg, "results") / "figures"; figs.mkdir(exist_ok=True)
 print(len(step0["retained"]), "samples,", len(channels), "channels")'''),
     code('''def run(sid):
     arrays, recs, chans = preprocess.process_sample(cfg, sid, data.load_eeg(cfg, sid), channels)
@@ -247,7 +247,7 @@ fc, fs = cfg["features"], cfg["dataset"]["sfreq"]
 step0 = json.loads((env.path(cfg, "derived") / "step0.json").read_text())
 clean = env.path(cfg, "derived") / "clean"
 tables = env.path(cfg, "results") / "tables"
-figs = env.path(cfg, "results") / "figures"
+figs = env.path(cfg, "results") / "figures"; figs.mkdir(exist_ok=True)
 rej = pd.read_csv(tables / "reject_rates.csv")'''),
     md("## 1. Spectra and band power"),
     code('''rows, spectra = [], []
