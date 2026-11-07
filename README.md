@@ -65,6 +65,21 @@ D2I_DATA=/path/to/ES606_Dream2Image .venv/bin/python -c "from d2i import runner;
 
 The runner pins BLAS to one thread: the matrices are small and multi-threaded BLAS is much slower here.
 
+Full run from scratch on a laptop (download included, about 10 minutes; needs a Hugging Face login with access to the dataset):
+
+```bash
+python3 -m venv .venv-full && .venv-full/bin/pip install -r requirements-local.txt -r requirements-colab.txt torch transformers pyarrow huggingface_hub
+D2I_DATA=/path/to/empty_folder .venv-full/bin/python -c "from d2i import runner; runner.run(['00_setup.ipynb', '01_data.ipynb', '02_preprocess.ipynb', '03_features.ipynb', '04_h1.ipynb', '05_h2.ipynb', '06_controls.ipynb', '07_benchmark.ipynb', '08_benchmark_h1.ipynb'])"
+.venv-full/bin/python tools/compare_results.py /path/to/empty_folder/results/tables
+```
+
+Rerun check (2026-11-07): fresh clone at `eb44907`, empty data folder, NB0-NB8 on macOS, Python 3.12.7, all nine
+notebooks without errors. All 26 tables have the same rows, columns and text; 20 agree to within 1e-4. The rest
+differ by at most 0.007, except one `case` site random-slope model for alpha in `h1_sensitivity.csv` (p .887 vs .836).
+These come from permutation p-values moving by one permutation and from small mixed models converging slightly
+differently on another platform. Every number quoted in the Results table above is unchanged at the precision shown.
+Per-table differences: `results/logs/rerun_comparison.csv`.
+
 ## Layout
 
 ```
